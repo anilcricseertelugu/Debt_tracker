@@ -1,8 +1,11 @@
 import React from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { Home, PlusCircle, CreditCard, LayoutDashboard } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { Home, PlusCircle, CreditCard, LayoutDashboard, LogIn, LogOut } from 'lucide-react';
 
-const Layout = () => {
+const Layout = ({ children }) => {
+    const { user, logout, isAdmin } = useAuth();
+
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
             {/* Header */}
@@ -16,15 +19,32 @@ const Layout = () => {
                     {/* Navigation */}
                     <nav className="flex items-center gap-1">
                         <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" end />
-                        <NavItem to="/add-loan" icon={<PlusCircle size={18} />} label="Add Loan" />
-                        <NavItem to="/pay" icon={<CreditCard size={18} />} label="Record Payment" />
+
+                        {isAdmin && (
+                            <>
+                                <NavItem to="/add-loan" icon={<PlusCircle size={18} />} label="Add Loan" />
+                                <NavItem to="/pay" icon={<CreditCard size={18} />} label="Record Payment" />
+                            </>
+                        )}
+
+                        {user ? (
+                            <button
+                                onClick={logout}
+                                className="flex items-center gap-2 px-4 py-2 rounded-md text-gray-600 hover:bg-gray-100 hover:text-red-600 transition-colors ml-2"
+                            >
+                                <LogOut size={18} />
+                                <span>Logout</span>
+                            </button>
+                        ) : (
+                            <NavItem to="/login" icon={<LogIn size={18} />} label="Login" />
+                        )}
                     </nav>
                 </div>
             </header>
 
             {/* Main Content */}
             <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
-                <Outlet />
+                {children}
             </main>
 
             {/* Footer */}

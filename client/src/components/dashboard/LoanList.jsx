@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { Card } from '../ui/Card';
 import { Button } from '../ui/Button';
 import { ChevronDown, ChevronUp, Trash2, Edit } from 'lucide-react';
 import { deleteBankLoan, deleteHandLoan } from '../../services/api';
 
-const BankLoanItem = ({ loan, onDelete, onEdit }) => {
+const BankLoanItem = ({ loan, onDelete, onEdit, isAdmin }) => {
     const [expanded, setExpanded] = useState(false);
 
     // Progress
@@ -29,9 +30,11 @@ const BankLoanItem = ({ loan, onDelete, onEdit }) => {
                     </div>
                 </div>
                 <div className="ml-4 flex items-center gap-2">
-                    <Button variant="ghost" className="p-2 text-gray-500 hover:text-blue-600" onClick={(e) => { e.stopPropagation(); onEdit(loan.loanId); }}>
-                        <Edit size={18} />
-                    </Button>
+                    {isAdmin && (
+                        <Button variant="ghost" className="p-2 text-gray-500 hover:text-blue-600" onClick={(e) => { e.stopPropagation(); onEdit(loan.loanId); }}>
+                            <Edit size={18} />
+                        </Button>
+                    )}
                     {expanded ? <ChevronUp className="text-gray-400" /> : <ChevronDown className="text-gray-400" />}
                 </div>
             </div>
@@ -57,18 +60,20 @@ const BankLoanItem = ({ loan, onDelete, onEdit }) => {
                         </div>
                     </div>
 
-                    <div className="flex justify-end gap-2">
-                        <Button variant="danger" size="sm" onClick={(e) => { e.stopPropagation(); onDelete(loan.loanId); }}>
-                            Close Loan
-                        </Button>
-                    </div>
+                    {isAdmin && (
+                        <div className="flex justify-end gap-2">
+                            <Button variant="danger" size="sm" onClick={(e) => { e.stopPropagation(); onDelete(loan.loanId); }}>
+                                Close Loan
+                            </Button>
+                        </div>
+                    )}
                 </div>
             )}
         </Card>
     );
 };
 
-const HandLoanItem = ({ loan, onDelete, onEdit }) => (
+const HandLoanItem = ({ loan, onDelete, onEdit, isAdmin }) => (
     <Card className="mb-4">
         <div className="flex justify-between items-start">
             <div>
@@ -78,14 +83,16 @@ const HandLoanItem = ({ loan, onDelete, onEdit }) => (
                     <p className="text-sm">Balance: <span className="font-bold text-gray-900">₹{loan.remainingBalance.toLocaleString()}</span></p>
                 </div>
             </div>
-            <div className="flex gap-1">
-                <Button variant="ghost" className="text-gray-500 hover:text-blue-600 p-2" onClick={() => onEdit(loan.loanId)}>
-                    <Edit size={18} />
-                </Button>
-                <Button variant="ghost" className="text-red-500 hover:text-red-700 p-2" onClick={() => onDelete(loan.loanId)}>
-                    <Trash2 size={18} />
-                </Button>
-            </div>
+            {isAdmin && (
+                <div className="flex gap-1">
+                    <Button variant="ghost" className="text-gray-500 hover:text-blue-600 p-2" onClick={() => onEdit(loan.loanId)}>
+                        <Edit size={18} />
+                    </Button>
+                    <Button variant="ghost" className="text-red-500 hover:text-red-700 p-2" onClick={() => onDelete(loan.loanId)}>
+                        <Trash2 size={18} />
+                    </Button>
+                </div>
+            )}
         </div>
     </Card>
 );
@@ -93,6 +100,7 @@ const HandLoanItem = ({ loan, onDelete, onEdit }) => (
 const LoanList = () => {
     const navigate = useNavigate();
     const { bankLoans, handLoans, refreshData } = useData();
+    const { isAdmin } = useAuth();
 
     const handleDeleteBank = async (id) => {
         if (window.confirm('Are you sure you want to close this loan?')) {
@@ -123,6 +131,7 @@ const LoanList = () => {
                         <BankLoanItem
                             key={loan.loanId}
                             loan={loan}
+                            isAdmin={isAdmin}
                             onDelete={handleDeleteBank}
                             onEdit={(id) => navigate(`/edit-loan/bank/${id}`)}
                         />
@@ -143,6 +152,7 @@ const LoanList = () => {
                         <HandLoanItem
                             key={loan.loanId}
                             loan={loan}
+                            isAdmin={isAdmin}
                             onDelete={handleDeleteHand}
                             onEdit={(id) => navigate(`/edit-loan/hand/${id}`)}
                         />
