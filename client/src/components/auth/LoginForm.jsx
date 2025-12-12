@@ -61,6 +61,16 @@ const LoginForm = () => {
                         </Button>
                     </div>
                 </form>
+
+                <div className="mt-4 text-center text-sm text-gray-600">
+                    Don't have an account?{' '}
+                    <span
+                        onClick={() => navigate('/register')}
+                        className="text-blue-600 hover:underline cursor-pointer font-medium"
+                    >
+                        Sign Up
+                    </span>
+                </div>
             </Card>
         </div>
     );

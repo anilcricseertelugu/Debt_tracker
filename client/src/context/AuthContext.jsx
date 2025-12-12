@@ -37,6 +37,27 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
+    const register = async (username, email, password) => {
+        try {
+            const { data } = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/register`, {
+                username,
+                email,
+                password
+            });
+
+            if (data.success) {
+                setUser(data.data);
+                localStorage.setItem('userInfo', JSON.stringify(data.data));
+                return { success: true };
+            }
+        } catch (error) {
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Registration failed'
+            };
+        }
+    };
+
     const logout = () => {
         localStorage.removeItem('userInfo');
         setUser(null);
@@ -60,7 +81,7 @@ export const AuthProvider = ({ children }) => {
     }, [user]);
 
     return (
-        <AuthContext.Provider value={{ user, login, logout, isAdmin: user?.role === 'admin' }}>
+        <AuthContext.Provider value={{ user, login, register, logout, isAdmin: user?.role === 'admin' }}>
             {!loading && children}
         </AuthContext.Provider>
     );

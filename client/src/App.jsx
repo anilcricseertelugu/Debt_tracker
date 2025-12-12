@@ -11,6 +11,7 @@ import EditBankLoanForm from './components/forms/EditBankLoanForm';
 import EditHandLoanForm from './components/forms/EditHandLoanForm';
 import RecordPaymentForm from './components/forms/RecordPaymentForm';
 import LoginForm from './components/auth/LoginForm';
+import RegisterForm from './components/auth/RegisterForm';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Layout>
             <Routes>
               <Route path="/login" element={<LoginForm />} />
+              <Route path="/register" element={<RegisterForm />} />
               <Route path="/" element={<Dashboard />} />
 
               <Route path="add-loan" element={<AddLoanSelector />} />

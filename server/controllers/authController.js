@@ -7,6 +7,42 @@ const generateToken = (id) => {
     });
 };
 
+exports.registerUser = async (req, res) => {
+    const { username, email, password } = req.body;
+
+    try {
+        const userExists = await User.findOne({ $or: [{ username }, { email }] });
+
+        if (userExists) {
+            return res.status(400).json({ success: false, message: 'User or Email already exists' });
+        }
+
+        const user = await User.create({
+            username,
+            email,
+            password,
+            role: 'guest' // Default role
+        });
+
+        if (user) {
+            res.status(201).json({
+                success: true,
+                data: {
+                    _id: user._id,
+                    username: user.username,
+                    email: user.email,
+                    role: user.role,
+                    token: generateToken(user._id),
+                }
+            });
+        } else {
+            res.status(400).json({ success: false, message: 'Invalid user data' });
+        }
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 exports.authUser = async (req, res) => {
     const { username, password } = req.body;
 
@@ -37,6 +73,7 @@ exports.seedAdmin = async () => {
         if (!adminExists) {
             await User.create({
                 username: 'anil',
+                email: 'anil@example.com', // Default admin email
                 password: 'admin@123',
                 role: 'admin'
             });
