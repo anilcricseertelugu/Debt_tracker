@@ -20,7 +20,7 @@ const Layout = ({ children }) => {
                     <nav className="flex items-center gap-1">
                         <NavItem to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" end />
 
-                        {isAdmin && (
+                        {user && (
                             <>
                                 <NavItem to="/add-loan" icon={<PlusCircle size={18} />} label="Add Loan" />
                                 <NavItem to="/pay" icon={<CreditCard size={18} />} label="Record Payment" />

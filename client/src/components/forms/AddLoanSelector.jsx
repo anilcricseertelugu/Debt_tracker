@@ -6,15 +6,15 @@ import { useAuth } from '../../context/AuthContext';
 
 const AddLoanSelector = () => {
     const navigate = useNavigate();
-    const { isAdmin } = useAuth();
+    const { user } = useAuth();
 
     useEffect(() => {
-        if (!isAdmin) {
+        if (!user) {
             navigate('/login');
         }
-    }, [isAdmin, navigate]);
+    }, [user, navigate]);
 
-    if (!isAdmin) return null;
+    if (!user) return null;
 
     return (
         <div className="max-w-4xl mx-auto">

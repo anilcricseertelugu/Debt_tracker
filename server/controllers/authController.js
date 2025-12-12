@@ -21,7 +21,7 @@ exports.registerUser = async (req, res) => {
             username,
             email,
             password,
-            role: 'guest' // Default role
+            role: 'user' // Default role
         });
 
         if (user) {

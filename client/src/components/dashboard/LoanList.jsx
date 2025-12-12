@@ -100,7 +100,7 @@ const HandLoanItem = ({ loan, onDelete, onEdit, isAdmin }) => (
 const LoanList = () => {
     const navigate = useNavigate();
     const { bankLoans, handLoans, refreshData } = useData();
-    const { isAdmin } = useAuth();
+    const { user } = useAuth();
 
     const handleDeleteBank = async (id) => {
         if (window.confirm('Are you sure you want to close this loan?')) {
@@ -131,7 +131,7 @@ const LoanList = () => {
                         <BankLoanItem
                             key={loan.loanId}
                             loan={loan}
-                            isAdmin={isAdmin}
+                            isAdmin={user}
                             onDelete={handleDeleteBank}
                             onEdit={(id) => navigate(`/edit-loan/bank/${id}`)}
                         />
@@ -152,7 +152,7 @@ const LoanList = () => {
                         <HandLoanItem
                             key={loan.loanId}
                             loan={loan}
-                            isAdmin={isAdmin}
+                            isAdmin={user}
                             onDelete={handleDeleteHand}
                             onEdit={(id) => navigate(`/edit-loan/hand/${id}`)}
                         />
