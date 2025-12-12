@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import Card from '../ui/Card';
+import { Card, CardHeader } from '../ui/Card';
+import { Button } from '../ui/Button';
+import { Input } from '../ui/Input';
 
 const RegisterForm = () => {
     const [formData, setFormData] = useState({
@@ -11,6 +13,7 @@ const RegisterForm = () => {
         confirmPassword: ''
     });
     const [error, setError] = useState('');
+    const [loading, setLoading] = useState(false);
     const { register } = useAuth();
     const navigate = useNavigate();
 
@@ -21,9 +24,11 @@ const RegisterForm = () => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setLoading(true);
 
         if (formData.password !== formData.confirmPassword) {
             setError('Passwords do not match');
+            setLoading(false);
             return;
         }
 
@@ -34,89 +39,71 @@ const RegisterForm = () => {
         } else {
             setError(result.message);
         }
+        setLoading(false);
     };
 
     return (
         <div className="flex justify-center items-center min-h-[80vh]">
-            <Card className="w-full max-w-md p-8">
-                <h2 className="text-2xl font-bold mb-6 text-center text-text-primary">Create Account</h2>
+            <Card className="w-full max-w-md">
+                <CardHeader title="Create Account" subtitle="Join to track your debts" />
 
-                {error && (
-                    <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded mb-4 text-sm">
-                        {error}
+                <form onSubmit={handleSubmit} className="mt-4">
+                    {error && (
+                        <div className="bg-red-50 text-red-600 p-3 rounded-md mb-4 text-sm">
+                            {error}
+                        </div>
+                    )}
+
+                    <Input
+                        label="Username"
+                        name="username"
+                        value={formData.username}
+                        onChange={handleChange}
+                        required
+                    />
+
+                    <Input
+                        label="Email"
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleChange}
+                        required
+                    />
+
+                    <Input
+                        label="Password"
+                        type="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        required
+                    />
+
+                    <Input
+                        label="Confirm Password"
+                        type="password"
+                        name="confirmPassword"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
+                        required
+                    />
+
+                    <div className="mt-6">
+                        <Button type="submit" loading={loading} className="w-full">
+                            Sign Up
+                        </Button>
                     </div>
-                )}
-
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-text-secondary text-sm font-medium mb-1">
-                            Username
-                        </label>
-                        <input
-                            type="text"
-                            name="username"
-                            value={formData.username}
-                            onChange={handleChange}
-                            className="w-full bg-background-main border border-border-color rounded-lg px-4 py-2 text-text-primary focus:outline-none focus:border-brand-primary"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-text-secondary text-sm font-medium mb-1">
-                            Email
-                        </label>
-                        <input
-                            type="email"
-                            name="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            className="w-full bg-background-main border border-border-color rounded-lg px-4 py-2 text-text-primary focus:outline-none focus:border-brand-primary"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-text-secondary text-sm font-medium mb-1">
-                            Password
-                        </label>
-                        <input
-                            type="password"
-                            name="password"
-                            value={formData.password}
-                            onChange={handleChange}
-                            className="w-full bg-background-main border border-border-color rounded-lg px-4 py-2 text-text-primary focus:outline-none focus:border-brand-primary"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-text-secondary text-sm font-medium mb-1">
-                            Confirm Password
-                        </label>
-                        <input
-                            type="password"
-                            name="confirmPassword"
-                            value={formData.confirmPassword}
-                            onChange={handleChange}
-                            className="w-full bg-background-main border border-border-color rounded-lg px-4 py-2 text-text-primary focus:outline-none focus:border-brand-primary"
-                            required
-                        />
-                    </div>
-
-                    <button
-                        type="submit"
-                        className="w-full bg-brand-primary hover:bg-brand-secondary text-white font-medium py-2 rounded-lg transition-colors mt-2"
-                    >
-                        Sign Up
-                    </button>
                 </form>
 
-                <div className="mt-4 text-center text-sm text-text-secondary">
+                <div className="mt-4 text-center text-sm text-gray-600">
                     Already have an account?{' '}
-                    <Link to="/login" className="text-brand-primary hover:underline">
+                    <span
+                        onClick={() => navigate('/login')}
+                        className="text-blue-600 hover:underline cursor-pointer font-medium"
+                    >
                         Login
-                    </Link>
+                    </span>
                 </div>
             </Card>
         </div>

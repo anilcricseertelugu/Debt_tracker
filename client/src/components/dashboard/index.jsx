@@ -12,8 +12,8 @@ const Dashboard = () => {
             </div>
 
             <SummaryCards />
-            <LoanList />
             <Analytics />
+            <LoanList />
         </div>
     );
 };
