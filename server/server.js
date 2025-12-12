@@ -1,9 +1,11 @@
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const errorHandler = require('./middleware/errorHandler');
 require('dotenv').config();
 
-// Import routes
+const app = express();
+
 // Import routes
 const bankLoanRoutes = require('./routes/bankLoans');
 const handLoanRoutes = require('./routes/handLoans');
@@ -11,6 +13,8 @@ const paymentRoutes = require('./routes/payments');
 const dashboardRoutes = require('./routes/dashboard');
 const calculationRoutes = require('./routes/calculations');
 const authRoutes = require('./routes/authRoutes');
+
+const { seedAdmin } = require('./controllers/authController');
 
 // Connect to MongoDB
 connectDB().then(async () => {
