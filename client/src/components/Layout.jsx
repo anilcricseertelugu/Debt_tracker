@@ -36,8 +36,10 @@ const Layout = ({ children }) => {
                                 <span>Logout</span>
                             </button>
                         ) : (
-                            <NavItem to="/login" icon={<LogIn size={18} />} label="Login" />
-                            <NavItem to="/register" icon={<PlusCircle size={18} />} label="Sign Up" />
+                            <>
+                                <NavItem to="/login" icon={<LogIn size={18} />} label="Login" />
+                                <NavItem to="/register" icon={<PlusCircle size={18} />} label="Sign Up" />
+                            </>
                         )}
                     </nav>
                 </div>
