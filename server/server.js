@@ -12,12 +12,9 @@ const dashboardRoutes = require('./routes/dashboard');
 const calculationRoutes = require('./routes/calculations');
 const authRoutes = require('./routes/authRoutes');
 
-const migrateData = require('./utils/migration');
-
 // Connect to MongoDB
 connectDB().then(async () => {
     await seedAdmin(); // Seed admin user after connection
-    await migrateData(); // Run migration to assign ownership
 });
 
 // Middleware
