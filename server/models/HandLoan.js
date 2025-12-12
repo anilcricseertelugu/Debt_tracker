@@ -12,7 +12,8 @@ const handLoanSchema = new mongoose.Schema({
     remainingBalance: { type: Number, required: true },
     lastInterestPaidDate: { type: Date },
     interestDue: { type: Number, default: 0 },
-    status: { type: String, enum: ['Active', 'Closed'], default: 'Active' }
+    status: { type: String, enum: ['Active', 'Closed'], default: 'Active' },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, {
     timestamps: true
 });

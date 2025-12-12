@@ -14,7 +14,8 @@ const bankLoanSchema = new mongoose.Schema({
     remainingPrincipal: { type: Number, required: true },
     totalInterestPayable: { type: Number, required: true },
     nextDueDate: { type: Date },
-    status: { type: String, enum: ['Active', 'Closed'], default: 'Active' }
+    status: { type: String, enum: ['Active', 'Closed'], default: 'Active' },
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }
 }, {
     timestamps: true
 });

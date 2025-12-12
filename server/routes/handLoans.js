@@ -2,11 +2,11 @@ const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/handLoanController');
 
-const { protect, admin } = require('../middleware/authMiddleware');
+const { protect, optionalProtect, admin } = require('../middleware/authMiddleware');
 
-router.get('/', controller.getAllHandLoans);
+router.get('/', optionalProtect, controller.getAllHandLoans);
 router.post('/', protect, admin, controller.createHandLoan);
-router.get('/:loanId', controller.getHandLoanById);
+router.get('/:loanId', optionalProtect, controller.getHandLoanById);
 router.put('/:loanId', protect, admin, controller.updateHandLoan);
 router.delete('/:loanId', protect, admin, controller.deleteHandLoan);
 

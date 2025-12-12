@@ -1,11 +1,15 @@
 const BankLoan = require('../models/BankLoan');
 const { generateBankLoanId } = require('../utils/idGenerator');
 const { calculateEMI, calculateRemainingPrincipal, calculateNextDueDate, calculateTotalInterest, generateAmortizationSchedule } = require('../utils/calculations');
+const { getUserIdForFilter } = require('../utils/authHelper');
 
 exports.getAllBankLoans = async (req, res) => {
     try {
         const { status } = req.query;
-        const filter = {};
+        const userId = await getUserIdForFilter(req);
+
+        const filter = { user: userId }; // Filter by User
+
         if (status && status !== 'All') {
             filter.status = status;
         } else if (!status) {
@@ -21,7 +25,9 @@ exports.getAllBankLoans = async (req, res) => {
 
 exports.getBankLoanById = async (req, res) => {
     try {
-        const loan = await BankLoan.findOne({ loanId: req.params.loanId });
+        const userId = await getUserIdForFilter(req);
+        const loan = await BankLoan.findOne({ loanId: req.params.loanId, user: userId });
+
         if (!loan) return res.status(404).json({ success: false, message: 'Loan not found' });
 
         // Generate amortization schedule on the fly for the response
@@ -73,7 +79,8 @@ exports.createBankLoan = async (req, res) => {
             emiAmount,
             remainingPrincipal,
             totalInterestPayable: totalInterest,
-            nextDueDate
+            nextDueDate,
+            user: req.user._id // Assign ownership
         });
 
         await newLoan.save();
@@ -89,7 +96,7 @@ exports.updateBankLoan = async (req, res) => {
         const updates = req.body;
 
         // Fetch existing loan to merge with updates if partial update (though form sends all)
-        const loan = await BankLoan.findOne({ loanId });
+        const loan = await BankLoan.findOne({ loanId, user: req.user._id }); // Ensure ownership
         if (!loan) return res.status(404).json({ success: false, message: 'Loan not found' });
 
         // Merge updates into a temporary object to calculate
@@ -139,10 +146,12 @@ exports.deleteBankLoan = async (req, res) => {
     try {
         // Soft delete
         const updated = await BankLoan.findOneAndUpdate(
-            { loanId: req.params.loanId },
+            { loanId: req.params.loanId, user: req.user._id }, // Ensure ownership
             { status: 'Closed' },
             { new: true }
         );
+        if (!updated) return res.status(404).json({ success: false, message: 'Loan not found' });
+
         res.json({ success: true, message: 'Loan closed', data: updated });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

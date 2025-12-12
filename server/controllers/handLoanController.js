@@ -1,11 +1,15 @@
 const HandLoan = require('../models/HandLoan');
 const { generateHandLoanId } = require('../utils/idGenerator');
 const { calculateAccruedInterest } = require('../utils/calculations');
+const { getUserIdForFilter } = require('../utils/authHelper');
 
 exports.getAllHandLoans = async (req, res) => {
     try {
         const { status } = req.query;
-        const filter = {};
+        const userId = await getUserIdForFilter(req);
+
+        const filter = { user: userId };
+
         if (status && status !== 'All') {
             filter.status = status;
         } else if (!status) {
@@ -21,7 +25,8 @@ exports.getAllHandLoans = async (req, res) => {
 
 exports.getHandLoanById = async (req, res) => {
     try {
-        const loan = await HandLoan.findOne({ loanId: req.params.loanId });
+        const userId = await getUserIdForFilter(req);
+        const loan = await HandLoan.findOne({ loanId: req.params.loanId, user: userId });
         if (!loan) return res.status(404).json({ success: false, message: 'Loan not found' });
 
         // Calculate current interest accrued for display?
@@ -43,7 +48,8 @@ exports.createHandLoan = async (req, res) => {
             ...data,
             remainingBalance: data.principalAmount, // Start with full balance
             totalRepaid: 0,
-            interestDue: 0
+            interestDue: 0,
+            user: req.user._id // Assign ownership
         });
 
         await newLoan.save();
@@ -55,7 +61,13 @@ exports.createHandLoan = async (req, res) => {
 
 exports.updateHandLoan = async (req, res) => {
     try {
-        const updated = await HandLoan.findOneAndUpdate({ loanId: req.params.loanId }, req.body, { new: true });
+        const updated = await HandLoan.findOneAndUpdate(
+            { loanId: req.params.loanId, user: req.user._id }, // Ensure ownership
+            req.body,
+            { new: true }
+        );
+        if (!updated) return res.status(404).json({ success: false, message: 'Loan not found' });
+
         res.json({ success: true, data: updated });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
@@ -65,10 +77,12 @@ exports.updateHandLoan = async (req, res) => {
 exports.deleteHandLoan = async (req, res) => {
     try {
         const updated = await HandLoan.findOneAndUpdate(
-            { loanId: req.params.loanId },
+            { loanId: req.params.loanId, user: req.user._id }, // Ensure ownership
             { status: 'Closed' },
             { new: true }
         );
+        if (!updated) return res.status(404).json({ success: false, message: 'Loan not found' });
+
         res.json({ success: true, message: 'Hand loan closed', data: updated });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });

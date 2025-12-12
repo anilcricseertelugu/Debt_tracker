@@ -1,24 +1,18 @@
 const BankLoan = require('../models/BankLoan');
 const HandLoan = require('../models/HandLoan');
-// const Payment = require('../models/Payment');
+const { getUserIdForFilter } = require('../utils/authHelper');
 
 exports.getDashboardSummary = async (req, res) => {
     try {
-        // Fetch all active loans
-        const bankLoans = await BankLoan.find({ status: 'Active' });
-        const handLoans = await HandLoan.find({ status: 'Active' });
+        const userId = await getUserIdForFilter(req);
+
+        // Fetch all active loans for this user
+        const bankLoans = await BankLoan.find({ status: 'Active', user: userId });
+        const handLoans = await HandLoan.find({ status: 'Active', user: userId });
 
         // Calculate totals
         const bankOutstanding = bankLoans.reduce((sum, loan) => sum + loan.remainingPrincipal, 0);
         const bankMonthly = bankLoans.reduce((sum, loan) => sum + loan.emiAmount, 0);
-        const bankInterestLiability = bankLoans.reduce((sum, loan) =>
-            sum + Math.max(0, (loan.totalInterestPayable - (loan.emiAmount * loan.emisPaid * (loan.interestRate / 100)))), 0
-            // Aprox calc for interest liability left? 
-            // Better: Calculate total remaining payments * EMI - remaining principal?
-            // Remaining EMIs = (Tenure - Paid). 
-            // Total Remaining Pay = Remaining EMIs * EMI.
-            // Interest Liability = Total Remaining Pay - Remaining Principal.
-        );
 
         // Correct Interest Liability Calculation
         let totalBankInterestLiability = 0;
@@ -48,7 +42,7 @@ exports.getDashboardSummary = async (req, res) => {
                     hand: handLoans.length,
                     total: bankLoans.length + handLoans.length
                 },
-                totalInterestLiability: Math.round(totalBankInterestLiability), // Mainly bank loans have predictable future interest
+                totalInterestLiability: Math.round(totalBankInterestLiability),
                 debtComposition: {
                     bankLoans: Math.round(bankOutstanding),
                     handLoansInterest: Math.round(handLoans.filter(l => l.loanType === 'Monthly_Interest').reduce((s, l) => s + l.remainingBalance, 0)),
@@ -64,8 +58,10 @@ exports.getDashboardSummary = async (req, res) => {
 
 exports.getDashboardAnalytics = async (req, res) => {
     try {
-        const bankLoans = await BankLoan.find({ status: 'Active' });
-        const handLoans = await HandLoan.find({ status: 'Active' });
+        const userId = await getUserIdForFilter(req);
+
+        const bankLoans = await BankLoan.find({ status: 'Active', user: userId });
+        const handLoans = await HandLoan.find({ status: 'Active', user: userId });
 
         // Debt Composition Pie Data
         const bankTotal = bankLoans.reduce((s, l) => s + l.remainingPrincipal, 0);
@@ -86,7 +82,6 @@ exports.getDashboardAnalytics = async (req, res) => {
 
         // Timeline
         const timeline = bankLoans.map(loan => {
-            // Estimate end date: Start + Tenure
             const end = new Date(loan.startDate);
             end.setMonth(end.getMonth() + loan.tenureMonths);
             return {
@@ -104,8 +99,6 @@ exports.getDashboardAnalytics = async (req, res) => {
                 },
                 principalVsInterest,
                 loanTimeline: timeline,
-                // Monthly Cashflow projection requires complex amortization generation for next 12 months for all loans.
-                // Omitted for brevity in this initial pass, or return empty placeholder
                 monthlyCashflow: []
             }
         });

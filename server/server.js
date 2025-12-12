@@ -12,18 +12,12 @@ const dashboardRoutes = require('./routes/dashboard');
 const calculationRoutes = require('./routes/calculations');
 const authRoutes = require('./routes/authRoutes');
 
-// Import controllers for seeding
-const { seedAdmin } = require('./controllers/authController');
-
-// Import error handler
-const errorHandler = require('./middleware/errorHandler');
-
-// Initialize app
-const app = express();
+const migrateData = require('./utils/migration');
 
 // Connect to MongoDB
-connectDB().then(() => {
-    seedAdmin(); // Seed admin user after connection
+connectDB().then(async () => {
+    await seedAdmin(); // Seed admin user after connection
+    await migrateData(); // Run migration to assign ownership
 });
 
 // Middleware
