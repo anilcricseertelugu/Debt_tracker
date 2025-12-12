@@ -42,7 +42,7 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
-    import api from '../services/api';
+
 
     // Attach token to all requests if user is logged in
     useEffect(() => {
