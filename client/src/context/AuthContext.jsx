@@ -19,7 +19,7 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (username, password) => {
         try {
-            const { data } = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/login`, {
+            const { data } = await api.post('/auth/login', {
                 username,
                 password
             });
@@ -30,16 +30,17 @@ export const AuthProvider = ({ children }) => {
                 return { success: true };
             }
         } catch (error) {
+            console.error('Login Error:', error);
             return {
                 success: false,
-                message: error.response?.data?.message || 'Login failed'
+                message: error.response?.data?.message || error.message || 'Login failed'
             };
         }
     };
 
     const register = async (username, email, password) => {
         try {
-            const { data } = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:3001/api'}/auth/register`, {
+            const { data } = await api.post('/auth/register', {
                 username,
                 email,
                 password
@@ -51,9 +52,10 @@ export const AuthProvider = ({ children }) => {
                 return { success: true };
             }
         } catch (error) {
+            console.error('Registration Error:', error);
             return {
                 success: false,
-                message: error.response?.data?.message || 'Registration failed'
+                message: error.response?.data?.message || error.message || 'Registration failed'
             };
         }
     };
