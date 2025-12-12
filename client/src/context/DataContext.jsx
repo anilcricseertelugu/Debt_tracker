@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import * as api from '../services/api';
+import { useAuth } from './AuthContext';
 
 const DataContext = createContext();
 
@@ -10,9 +11,11 @@ export const useData = () => {
 };
 
 export const DataProvider = ({ children }) => {
+    const { user } = useAuth(); // Get user from AuthContext
     const [bankLoans, setBankLoans] = useState([]);
     const [handLoans, setHandLoans] = useState([]);
     const [dashboardSummary, setDashboardSummary] = useState(null);
+    const [analytics, setAnalytics] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
@@ -20,15 +23,17 @@ export const DataProvider = ({ children }) => {
     const refreshData = useCallback(async () => {
         setLoading(true);
         try {
-            const [bankRes, handRes, summaryRes] = await Promise.all([
+            const [bankRes, handRes, summaryRes, analyticsRes] = await Promise.all([
                 api.getBankLoans('Active'),
                 api.getHandLoans('Active'),
-                api.getDashboardSummary()
+                api.getDashboardSummary(),
+                api.getDashboardAnalytics()
             ]);
 
             if (bankRes.data.success) setBankLoans(bankRes.data.data);
             if (handRes.data.success) setHandLoans(handRes.data.data);
             if (summaryRes.data.success) setDashboardSummary(summaryRes.data.data);
+            if (analyticsRes.data.success) setAnalytics(analyticsRes.data.data);
 
             setError(null);
         } catch (err) {
@@ -37,7 +42,7 @@ export const DataProvider = ({ children }) => {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [user]); // Depend on user so it sees the latest token in interceptor (via localStorage which is sync, but good practice to react to auth change)
 
     useEffect(() => {
         refreshData();
@@ -47,6 +52,7 @@ export const DataProvider = ({ children }) => {
         bankLoans,
         handLoans,
         dashboardSummary,
+        analytics,
         loading,
         error,
         refreshData

@@ -1,19 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 import { Pie, Bar } from 'react-chartjs-2';
-import { getDashboardAnalytics } from '../../services/api';
+import { useData } from '../../context/DataContext';
 import { Card } from '../ui/Card';
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
 
 const Analytics = () => {
-    const [data, setData] = useState(null);
-
-    useEffect(() => {
-        getDashboardAnalytics().then(res => {
-            if (res.data.success) setData(res.data.data);
-        }).catch(err => console.error(err));
-    }, []);
+    const { analytics: data } = useData();
 
     if (!data) return null;
 

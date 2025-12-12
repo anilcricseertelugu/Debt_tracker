@@ -5,17 +5,11 @@ import api from '../services/api';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        // Check local storage for token
+    const [user, setUser] = useState(() => {
         const userInfo = localStorage.getItem('userInfo');
-        if (userInfo) {
-            setUser(JSON.parse(userInfo));
-        }
-        setLoading(false);
-    }, []);
+        return userInfo ? JSON.parse(userInfo) : null;
+    });
+    const [loading, setLoading] = useState(false);
 
     const login = async (username, password) => {
         try {
@@ -67,20 +61,7 @@ export const AuthProvider = ({ children }) => {
 
 
 
-    // Attach token to all requests if user is logged in
-    useEffect(() => {
-        const interceptor = api.interceptors.request.use(
-            (config) => {
-                if (user && user.token) {
-                    config.headers.Authorization = `Bearer ${user.token}`;
-                }
-                return config;
-            },
-            (error) => Promise.reject(error)
-        );
-
-        return () => api.interceptors.request.eject(interceptor);
-    }, [user]);
+    // Token is now handled in api.js interceptor directly associated with localStorage
 
     return (
         <AuthContext.Provider value={{ user, login, register, logout, isAdmin: user?.role === 'admin' }}>

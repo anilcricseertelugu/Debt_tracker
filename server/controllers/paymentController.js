@@ -3,6 +3,7 @@ const BankLoan = require('../models/BankLoan');
 const HandLoan = require('../models/HandLoan');
 const { generatePaymentId } = require('../utils/idGenerator');
 const { calculateNextDueDate } = require('../utils/calculations');
+const { getUserIdForFilter } = require('../utils/authHelper');
 
 exports.createPayment = async (req, res) => {
     try {
@@ -110,7 +111,8 @@ exports.createPayment = async (req, res) => {
             principalPaid,
             interestPaid,
             balanceAfterPayment,
-            notes
+            notes,
+            user: req.user._id // Correctly assign user
         });
 
         await payment.save();
@@ -135,7 +137,9 @@ exports.createPayment = async (req, res) => {
 exports.getPayments = async (req, res) => {
     try {
         const { loanId, startDate, endDate } = req.query;
-        const filter = {};
+        const userId = await getUserIdForFilter(req);
+
+        const filter = { user: userId }; // Filter by User
         if (loanId) filter.loanId = loanId;
 
         if (startDate || endDate) {
