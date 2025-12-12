@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import axios from 'axios';
+import api from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -41,9 +42,11 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
+    import api from '../services/api';
+
     // Attach token to all requests if user is logged in
     useEffect(() => {
-        const interceptor = axios.interceptors.request.use(
+        const interceptor = api.interceptors.request.use(
             (config) => {
                 if (user && user.token) {
                     config.headers.Authorization = `Bearer ${user.token}`;
@@ -53,7 +56,7 @@ export const AuthProvider = ({ children }) => {
             (error) => Promise.reject(error)
         );
 
-        return () => axios.interceptors.request.eject(interceptor);
+        return () => api.interceptors.request.eject(interceptor);
     }, [user]);
 
     return (
