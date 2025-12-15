@@ -12,6 +12,7 @@ import EditHandLoanForm from './components/forms/EditHandLoanForm';
 import RecordPaymentForm from './components/forms/RecordPaymentForm';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
+import BudgetTracker from './components/budget/BudgetTracker';
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
               <Route path="edit-loan/hand/:loanId" element={<EditHandLoanForm />} />
 
               <Route path="pay" element={<RecordPaymentForm />} />
+              <Route path="budget-tracker" element={<BudgetTracker />} />
             </Routes>
           </Layout>
         </Router>

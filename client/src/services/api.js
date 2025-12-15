@@ -92,4 +92,19 @@ export const calculateForeclosure = (data) =>
 export const getAmortizationSchedule = (loanId) =>
     api.get(`/calculate/amortization/${loanId}`);
 
+// --- Budget ---
+export const getIncomes = () => api.get('/budget/income');
+export const addIncome = (data) => api.post('/budget/income', data);
+export const deleteIncome = (id) => api.delete(`/budget/income/${id}`);
+
+export const getExpenses = () => api.get('/budget/expenses');
+export const addExpense = (data) => api.post('/budget/expenses', data);
+export const deleteExpense = (id) => api.delete(`/budget/expenses/${id}`);
+
+export const getRecurringExpenses = () => api.get('/budget/recurring');
+export const addRecurringExpense = (data) => api.post('/budget/recurring', data);
+export const deleteRecurringExpense = (id) => api.delete(`/budget/recurring/${id}`);
+
+export const getBudgetSummary = () => api.get('/budget/summary');
+
 export default api;

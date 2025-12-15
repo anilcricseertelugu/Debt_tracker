@@ -13,6 +13,7 @@ const paymentRoutes = require('./routes/payments');
 const dashboardRoutes = require('./routes/dashboard');
 const calculationRoutes = require('./routes/calculations');
 const authRoutes = require('./routes/authRoutes');
+const budgetRoutes = require('./routes/budgetRoutes');
 
 const { seedAdmin } = require('./controllers/authController');
 
@@ -34,6 +35,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/calculate', calculationRoutes);
 
+app.use('/api/budget', budgetRoutes);
+
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK', message: 'Server is running' });
@@ -47,3 +50,4 @@ const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+// Server running on port 3001
