@@ -58,13 +58,20 @@ exports.initSimulation = async (req, res) => {
         // Delete old sessions for cleanup? Optional.
         await SimulationSession.deleteMany({ user: userId });
 
+        const initialSurplus = totalIncome - totalRecurring - (loanSnapshots.reduce((sum, l) => sum + (l.emi || l.monthlyInterest || 0), 0));
+
         const session = new SimulationSession({
             user: userId,
             currentDate: new Date(), // Today
-            walletBalance: 0, // Starts fresh? Or should we ask user? Default 0.
+            walletBalance: 0,
             monthlyIncome: totalIncome,
             monthlyExpenses: totalRecurring,
-            loansSnapshot: loanSnapshots
+            initialMonthlySurplus: initialSurplus, // Baseline
+            loansSnapshot: loanSnapshots,
+            financialBreakdown: {
+                rollover: 0,
+                monthlySurplus: 0 // Starts at 0, shows gain/loss relative to start
+            }
         });
 
         await session.save();
@@ -82,7 +89,6 @@ exports.processNextStage = async (req, res) => {
     try {
         const userId = await getUserIdForFilter(req);
         const { extraPayments } = req.body; // { loanId: amount, ... }
-        console.log("User:", userId, "Extras:", extraPayments);
 
         // 1. Get Current Session
         const session = await SimulationSession.findOne({ user: userId });
@@ -124,6 +130,26 @@ exports.processNextStage = async (req, res) => {
 
         // So, the 'processNextStage' effectively CLOSES the current month.
 
+        // --- NEW: Calculate "Rollover" before adding new income ---
+        // At this specific line, 'wallet' contains the Balance *after* user made Extra Payments (if logic was above)
+        // correct? The logic below:
+        // A. Apply User's Extra Payments (Pre-Payment)
+        // Wait, the logic structure in file is: 
+        // 1. Add Income
+        // 2. Subtract Expenses
+        // ...
+        // 4. Apply Extra Payments (User Decision)
+
+        // This order is tricky for "Rollover".
+        // Conceptually:
+        // Start of M2: Wallet has X (Rollover from M1).
+        // Then M2 Income arrives.
+
+        // So `session.walletBalance` IS the rollover at the start of the logic?
+        // YES. `let wallet = session.walletBalance;` at line 99.
+
+        const rolloverAmount = wallet; // Captured before any monthly modifications
+
         // Step 1: Add Income
         wallet += (session.monthlyIncome || 0);
 
@@ -133,6 +159,7 @@ exports.processNextStage = async (req, res) => {
         console.log("Wallet after Income/Exp:", wallet);
 
         // Step 3: Process Loans (Standard Obligations)
+        let totalObligations = 0;
         if (session.loansSnapshot) {
             session.loansSnapshot.forEach(loan => {
                 if (loan.status === 'Closed') return;
@@ -152,6 +179,8 @@ exports.processNextStage = async (req, res) => {
                     interestCharged = loan.monthlyInterest || 0;
                 }
 
+                totalObligations += paymentDue;
+
                 // Deduct from Wallet (Mandatory Payment)
                 wallet -= paymentDue;
 
@@ -170,6 +199,11 @@ exports.processNextStage = async (req, res) => {
                 }
             });
         }
+
+        // CALC: Monthly Surplus (The "New" Cash this month)
+        // Income - Expenses - Obligations
+        const monthlySurplus = (session.monthlyIncome || 0) - (session.monthlyExpenses || 0) - totalObligations;
+
         console.log("Wallet after Obligations:", wallet);
 
         // Step 4: Apply Extra Payments (User Decision)
@@ -206,6 +240,37 @@ exports.processNextStage = async (req, res) => {
         session.currentDate = getNextMonth(session.currentDate);
         session.walletBalance = wallet;
 
+        // Save Breakdown
+        // Note: The 'rolloverAmount' we calculated at top was BEFORE Current Month's payments were processed?
+        // Wait, logic check:
+        // Scenario: M1 Surplus = 10k.
+        // User pays 5k Extra.
+        // processNextStage Called.
+        // Line 99: wallet = 10k.
+        // line 100: rolloverAmount = 10k.
+        // Then Step 1-3 run for M2.
+        // Step 4 runs Extra Payment? 
+        // WAIT. Extra payment logic is at lines 162+.
+        // It subtracts from `wallet`.
+
+        // Does Extra Payment come from "Rollover" or "Current Month Cash"?
+        // It comes from the `wallet` variable which ACCUMULATES everything.
+        // So the order matters for *calculation* but not final result?
+        // But for "user to know", Rollover = What they started with.
+
+        // However, if I pay Extra *inside* this function, that extra payment effectively reduces the rollover?
+        // Or reduces the new surplus?
+        // Usually Extra Payment is done at END of month (using surplus).
+        // So rollover is intact?
+
+        // Let's stick to simplest definition: Rollover = What was in wallet when function started.
+
+        session.financialBreakdown = {
+            rollover: rolloverAmount,
+            monthlySurplus: monthlySurplus // Absolute value: Income - Expenses - CurrentObligations
+        };
+
+        session.markModified('loansSnapshot'); // CRITICAL: Ensure nested array changes (status='Closed') are persisted
         console.log("Saving Session...", session.currentDate);
         await session.save();
         console.log("Session Saved.");

@@ -113,11 +113,36 @@ const DebtSimulator = () => {
     const monthLabel = new Date(session.currentDate).toLocaleDateString('default', { month: 'long', year: 'numeric' });
     const currentWallet = session.walletBalance || 0;
     const loans = session.loansSnapshot || [];
+    const breakdown = session.financialBreakdown || { rollover: 0, monthlySurplus: 0 };
 
     // CALCULATIONS for "What-If"
     const totalExtraPay = Object.values(extraPayments).reduce((sum, val) => sum + (Number(val) || 0), 0);
     const projectedWallet = currentWallet - totalExtraPay;
     const isWalletNegative = projectedWallet < 0;
+
+    // Dynamic: Calculate Potential Freed Cash Flow (Next Month's New Surplus)
+    // If a loan is fully paid off now, its EMI is added to next month's surplus.
+    const potentialFreedCash = loans.reduce((sum, loan) => {
+        if (loan.remainingBalance <= 0) return sum; // Already closed
+        const extra = Number(extraPayments[loan._id] || 0);
+        // If balance cleared
+        if (loan.remainingBalance - extra <= 0) {
+            return sum + (loan.emi || loan.monthlyInterest || 0);
+        }
+        return sum;
+    }, 0);
+
+    // DYNAMIC: Live Monthly Free Cash (Income - Expenses - ACTIVE EMIs)
+    // This ensures that as soon as a loan is closed, the 'Free Cash' immediately reflects the gain.
+    const activeLoansEMI = loans.reduce((sum, loan) => {
+        if (loan.remainingBalance > 0) {
+            return sum + (loan.emi || loan.monthlyInterest || 0);
+        }
+        return sum;
+    }, 0);
+
+    // We use the session's income/expenses directly.
+    const liveMonthlyFreeCash = (session.monthlyIncome || 0) - (session.monthlyExpenses || 0) - activeLoansEMI;
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-20">
@@ -140,110 +165,162 @@ const DebtSimulator = () => {
                         )}
                         ₹{projectedWallet.toLocaleString()}
                     </div>
+                    {/* Breakdown Display */}
+                    <div className="text-xs text-gray-500 mt-1 flex justify-end gap-2 font-medium items-center">
+                        <span className="text-gray-400">Rollover: ₹{Math.round(breakdown.rollover).toLocaleString()}</span>
+                        <span className="text-gray-300">|</span>
+                        <div className="flex items-center gap-1">
+                            <span className="text-blue-600">Monthly Free Cash: ₹{Math.round(liveMonthlyFreeCash).toLocaleString()}</span>
+                            {potentialFreedCash > 0 && (
+                                <span className="text-emerald-600 bg-emerald-50 px-1 rounded animate-pulse">
+                                    (+₹{Math.round(potentialFreedCash).toLocaleString()} Next Month)
+                                </span>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Loan Cards Grid */}
-            <div className="grid gap-6">
-                {loans.length === 0 && (
-                    <div className="p-12 text-center bg-gray-50 rounded-xl border border-dashed border-gray-300">
-                        <h3 className="text-xl font-bold text-gray-700">Debt Free!</h3>
-                        <p className="text-gray-500">You have no active loans in this simulation.</p>
-                    </div>
-                )}
+            {/* Dashboard Table Layout */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                            <tr>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Loan Details</th>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Interest Rate</th>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Balance</th>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Monthly Due</th>
+                                <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Pay Extra</th>
+                            </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                            {loans.map(loan => {
+                                if (loan.remainingBalance <= 0) return null;
 
-                {loans.map(loan => {
-                    // Hide closed loans
-                    if (loan.remainingBalance <= 0) return null;
+                                const extra = Number(extraPayments[loan._id] || 0);
+                                const projectedBalance = Math.max(0, loan.remainingBalance - extra);
+                                const rate = loan.interestRate || 0;
 
-                    const extra = Number(extraPayments[loan._id] || 0);
-                    const projectedBalance = Math.max(0, loan.remainingBalance - extra);
 
-                    // Interest Calculation (Client Side Est.)
-                    let interestAmount = 0;
-                    if (loan.type === 'Bank') {
-                        const r = loan.interestRate || 0;
-                        interestAmount = (loan.remainingBalance * r / 100) / 12;
-                    } else {
-                        interestAmount = loan.monthlyInterest || 0;
-                    }
 
-                    return (
-                        <Card key={loan._id} className="hover:shadow-md transition-shadow relative overflow-hidden">
-                            {/* Interest Ribbon/Badge */}
-                            <div className="absolute top-0 right-0 bg-orange-100 text-orange-800 text-[10px] font-bold px-2 py-1 rounded-bl-lg uppercase tracking-wide">
-                                Interest: ₹{Math.round(interestAmount).toLocaleString()}
-                            </div>
+                                // Precise Savings Calculation (Difference in Total Interest Payable)
+                                let totalSavings = 0;
+                                if (extra > 0 && loan.type === 'Bank' && rate > 0 && loan.emi > 0) {
+                                    const r = rate / 1200;
 
-                            <div className="p-6 flex flex-col md:flex-row items-center gap-6">
-                                {/* Loan Info */}
-                                <div className="flex-1">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <span className={`px-2 py-0.5 text-xs font-bold rounded ${loan.type === 'Bank' ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'}`}>
-                                            {loan.type}
-                                        </span>
-                                        <h3 className="font-bold text-lg text-gray-900">{loan.name}</h3>
-                                    </div>
-                                    <div className="flex gap-8 mt-4 text-sm">
-                                        <div>
-                                            <span className="block text-gray-400 text-xs uppercase mb-1">Balance</span>
-                                            <div className="font-mono font-bold text-lg text-gray-800 flex items-center gap-2">
+                                    // Function to calculate Total Remaining Interest
+                                    const getInterest = (bal, emi, r) => {
+                                        if (bal <= 0) return 0;
+                                        // NPER = -ln(1 - (r*PV)/PMT) / ln(1+r)
+                                        const numerator = 1 - (r * bal / emi);
+                                        if (numerator <= 0) return 0; // Should not happen for valid loan, implies paid off
+                                        const nper = -Math.log(numerator) / Math.log(1 + r);
+                                        const totalPayable = nper * emi;
+                                        return Math.max(0, totalPayable - bal);
+                                    };
+
+                                    const currentInterest = getInterest(loan.remainingBalance, loan.emi, r);
+
+                                    if (projectedBalance <= 0) {
+                                        // Full Payment: You save ALL remaining interest
+                                        totalSavings = currentInterest;
+                                    } else {
+                                        // Partial Payment: Savings = Old Interest - New Interest
+                                        // Note: EMI usually stays same for partial payment in many Indian banks (tenure reduces).
+                                        // So we calculate new interest assuming SAME EMI but lower balance.
+                                        const newInterest = getInterest(projectedBalance, loan.emi, r);
+                                        totalSavings = currentInterest - newInterest;
+                                    }
+                                }
+
+                                return (
+                                    <tr key={loan._id} className="hover:bg-gray-50 transition-colors group">
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex items-center">
+                                                <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${loan.type === 'Bank' ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}`}>
+                                                    {loan.type[0]}
+                                                </div>
+                                                <div className="ml-3">
+                                                    <div className="text-sm font-bold text-gray-900">{loan.name}</div>
+                                                    <div className="text-xs text-gray-500">{loan.type} Loan</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {loan.type === 'Bank' ? (
+                                                <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-50 text-blue-700">
+                                                    {rate}% p.a.
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-gray-400">Fixed</span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="text-sm font-mono font-bold text-gray-700">
                                                 {extra > 0 ? (
-                                                    <>
-                                                        <span className="text-gray-400 line-through text-sm">₹{Math.round(loan.remainingBalance).toLocaleString()}</span>
-                                                        <span className="text-green-600">₹{Math.round(projectedBalance).toLocaleString()}</span>
-                                                    </>
+                                                    <div className="flex flex-col">
+                                                        <span className="text-gray-400 line-through text-xs">₹{Math.round(loan.remainingBalance).toLocaleString()}</span>
+                                                        <span className="text-emerald-600">₹{Math.round(projectedBalance).toLocaleString()}</span>
+                                                    </div>
                                                 ) : (
                                                     <span>₹{Math.round(loan.remainingBalance).toLocaleString()}</span>
                                                 )}
                                             </div>
-                                        </div>
-                                        <div>
-                                            <span className="block text-gray-400 text-xs uppercase mb-1">{loan.type === 'Bank' ? 'EMI' : 'Int Due'}</span>
-                                            <span className="font-medium text-gray-600 text-lg">₹{Number(loan.emi || loan.monthlyInterest).toLocaleString()}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Action: Pay Extra */}
-                                <div className="w-full md:w-auto flex flex-col gap-2 min-w-[220px]">
-                                    <label className="text-xs font-bold text-gray-500 uppercase flex justify-between">
-                                        <span>Pay Extra</span>
-                                        {extra > 0 && <span className="text-green-600">-{Math.round((extra / loan.remainingBalance) * 100)}%</span>}
-                                    </label>
-                                    <div className="flex gap-2">
-                                        <div className="relative flex-1">
-                                            <span className="absolute left-3 top-2.5 text-gray-400">₹</span>
-                                            <input
-                                                type="number"
-                                                value={extraPayments[loan._id] || ''}
-                                                onChange={(e) => handlePaymentChange(loan._id, e.target.value)}
-                                                className="w-full pl-7 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none font-bold text-gray-700"
-                                                placeholder="0"
-                                            />
-                                        </div>
-                                        <button
-                                            onClick={() => handlePaymentChange(loan._id, currentWallet)}
-                                            className="px-3 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-xs font-bold hover:text-blue-600 border"
-                                            title="Use Max Wallet"
-                                        >
-                                            MAX
-                                        </button>
-                                    </div>
-                                    {extra > 0 && (
-                                        <div className="text-xs text-right text-gray-400">
-                                            Will save ~₹{Math.round(extra * (loan.interestRate / 100)).toLocaleString()} interest/yr
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </Card>
-                    );
-                })}
-            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            ₹{Number(loan.emi || loan.monthlyInterest).toLocaleString()}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                {extra > 0 && loan.type === 'Bank' && (
+                                                    <span className="text-[10px] text-emerald-600 font-medium mr-2">
+                                                        Save ~₹{Math.round(totalSavings).toLocaleString()} Total
+                                                    </span>
+                                                )}
+                                                {extra > 0 && loan.type === 'Hand' && (
+                                                    <span className="text-[10px] text-emerald-600 font-medium mr-2">
+                                                        Save ₹{Math.round(extra * (loan.interestRate || 24) / 1200).toLocaleString()}/mo
+                                                    </span>
+                                                )}
+                                                <div className="relative w-32">
+                                                    <span className="absolute left-2 top-1.5 text-gray-400 text-xs">₹</span>
+                                                    <input
+                                                        type="number"
+                                                        value={extraPayments[loan._id] || ''}
+                                                        onChange={(e) => handlePaymentChange(loan._id, e.target.value)}
+                                                        className="w-full pl-5 pr-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-right"
+                                                        placeholder="0"
+                                                    />
+                                                </div>
+                                                {extra < loan.remainingBalance && (
+                                                    <button
+                                                        onClick={() => handlePaymentChange(loan._id, Math.ceil(loan.remainingBalance))}
+                                                        className="ml-2 text-[10px] bg-red-50 text-red-600 hover:bg-red-100 px-2 py-1 rounded border border-red-200 transition-colors whitespace-nowrap"
+                                                        title={`Pay full balance of ₹${Math.ceil(loan.remainingBalance)}`}
+                                                    >
+                                                        Foreclose
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            {loans.length === 0 && (
+                                <tr>
+                                    <td colSpan="5" className="px-6 py-10 text-center text-gray-500 text-sm">
+                                        No active loans. You are debt free!
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div >
 
             {/* Bottom Action Bar */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-20 shadow-lg md:pl-64">
+            < div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-20 shadow-lg md:pl-64" >
                 <div className="max-w-4xl mx-auto flex justify-between items-center">
                     <button
                         onClick={handleInit}
@@ -256,8 +333,8 @@ const DebtSimulator = () => {
                         onClick={handleNextStage}
                         disabled={processing || isWalletNegative}
                         className={`flex items-center gap-2 px-8 py-3 text-white text-lg font-bold rounded-full shadow-lg transition-all ${isWalletNegative
-                                ? 'bg-gray-400 cursor-not-allowed'
-                                : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-200/50'
+                            ? 'bg-gray-400 cursor-not-allowed'
+                            : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-200/50'
                             }`}
                     >
                         {processing ? 'Calculating...' : (
@@ -267,8 +344,8 @@ const DebtSimulator = () => {
                         )}
                     </button>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 

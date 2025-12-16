@@ -10,6 +10,7 @@ const simulationSessionSchema = new mongoose.Schema({
     // Fixed Monthly Stats (copied from Budget at start, can be modified during sim if we add that feature)
     monthlyIncome: { type: Number, required: true },
     monthlyExpenses: { type: Number, required: true }, // Bills
+    initialMonthlySurplus: { type: Number, default: 0 }, // Baseline to calculate "New Surplus" (Freed Cash)
 
     // Deep Copy of Loans at this specific stage
     loansSnapshot: [{
@@ -26,6 +27,11 @@ const simulationSessionSchema = new mongoose.Schema({
         // Status in Simulation
         status: { type: String, enum: ['Active', 'Closed'], default: 'Active' }
     }],
+
+    financialBreakdown: {
+        rollover: { type: Number, default: 0 },
+        monthlySurplus: { type: Number, default: 0 }
+    },
 
     lastUpdated: { type: Date, default: Date.now }
 }, {
