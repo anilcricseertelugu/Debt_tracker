@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../ui/Card';
-import { Play, ArrowRight, DollarSign, Calendar, TrendingUp, RefreshCw } from 'lucide-react';
+import { Play, ArrowRight, DollarSign, Calendar, TrendingUp, RefreshCw, ArrowLeft } from 'lucide-react';
 import * as api from '../../services/api';
 
 const DebtSimulator = () => {
@@ -10,7 +10,7 @@ const DebtSimulator = () => {
     const [processing, setProcessing] = useState(false);
 
     useEffect(() => {
-        console.log("Premium Simulator Mounted");
+        console.log("DebtSimulator Component Mounted");
         loadSession();
     }, []);
 
@@ -48,7 +48,6 @@ const DebtSimulator = () => {
     const handleNextStage = async () => {
         try {
             setProcessing(true);
-            // Defensive: Extra Payments
             const res = await api.nextSimulationStage({ extraPayments });
             if (res.data.success) {
                 setSession(res.data.data);
@@ -56,9 +55,25 @@ const DebtSimulator = () => {
             }
         } catch (err) {
             console.error("Next Stage Error:", err);
-            // Try to show server message if available
             const msg = err.response?.data?.message || err.message;
             alert("Simulation Error: " + msg);
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    const handleReverse = async () => {
+        try {
+            if (!confirm("Go back to the previous month? Current changes will be lost.")) return;
+            setProcessing(true);
+            const res = await api.reverseSimulation();
+            if (res.data.success) {
+                setSession(res.data.data);
+                setExtraPayments({});
+            }
+        } catch (err) {
+            const msg = err.response?.data?.message || err.message;
+            alert("Cannot Reverse: " + msg);
         } finally {
             setProcessing(false);
         }
@@ -73,7 +88,6 @@ const DebtSimulator = () => {
 
     if (loading) return <div className="p-8 text-center text-gray-500">Loading Simulator...</div>;
 
-    // 1. Start Screen
     if (!session) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6">
@@ -99,8 +113,6 @@ const DebtSimulator = () => {
         );
     }
 
-    // 2. Active Stage View
-    // Defensive Check
     if (!session.currentDate) {
         return (
             <div className="p-8 text-center">
@@ -115,33 +127,25 @@ const DebtSimulator = () => {
     const loans = session.loansSnapshot || [];
     const breakdown = session.financialBreakdown || { rollover: 0, monthlySurplus: 0 };
 
-    // CALCULATIONS for "What-If"
     const totalExtraPay = Object.values(extraPayments).reduce((sum, val) => sum + (Number(val) || 0), 0);
     const projectedWallet = currentWallet - totalExtraPay;
     const isWalletNegative = projectedWallet < 0;
 
-    // Dynamic: Calculate Potential Freed Cash Flow (Next Month's New Surplus)
-    // If a loan is fully paid off now, its EMI is added to next month's surplus.
-    const potentialFreedCash = loans.reduce((sum, loan) => {
-        if (loan.remainingBalance <= 0) return sum; // Already closed
+    // SAFE CALCULATION: Helper to avoid reducing empty/null arrays
+    const potentialFreedCash = (loans || []).reduce((sum, loan) => {
+        if (!loan || loan.remainingBalance <= 0) return sum;
         const extra = Number(extraPayments[loan._id] || 0);
-        // If balance cleared
         if (loan.remainingBalance - extra <= 0) {
             return sum + (loan.emi || loan.monthlyInterest || 0);
         }
         return sum;
     }, 0);
 
-    // DYNAMIC: Live Monthly Free Cash (Income - Expenses - ACTIVE EMIs)
-    // This ensures that as soon as a loan is closed, the 'Free Cash' immediately reflects the gain.
-    const activeLoansEMI = loans.reduce((sum, loan) => {
-        if (loan.remainingBalance > 0) {
-            return sum + (loan.emi || loan.monthlyInterest || 0);
-        }
-        return sum;
+    const activeLoansEMI = (loans || []).reduce((sum, loan) => {
+        if (!loan || loan.remainingBalance <= 0) return sum;
+        return sum + (loan.emi || loan.monthlyInterest || 0);
     }, 0);
 
-    // We use the session's income/expenses directly.
     const liveMonthlyFreeCash = (session.monthlyIncome || 0) - (session.monthlyExpenses || 0) - activeLoansEMI;
 
     return (
@@ -196,42 +200,40 @@ const DebtSimulator = () => {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                             {loans.map(loan => {
+                                // DEFENSIVE CHECK: Ensure loan is valid
+                                if (!loan || !loan._id) return null;
                                 if (loan.remainingBalance <= 0) return null;
 
                                 const extra = Number(extraPayments[loan._id] || 0);
                                 const projectedBalance = Math.max(0, loan.remainingBalance - extra);
                                 const rate = loan.interestRate || 0;
 
-
-
-                                // Precise Savings Calculation (Difference in Total Interest Payable)
                                 let totalSavings = 0;
-                                if (extra > 0 && loan.type === 'Bank' && rate > 0 && loan.emi > 0) {
-                                    const r = rate / 1200;
+                                // Safe Interest Calc
+                                try {
+                                    if (extra > 0 && loan.type === 'Bank' && rate > 0 && loan.emi > 0) {
+                                        const r = rate / 1200;
+                                        const getInterest = (bal, emi, r) => {
+                                            if (bal <= 0) return 0;
+                                            const numerator = 1 - (r * bal / emi);
+                                            // Handle potential NaN if numerator <= 0
+                                            if (numerator <= 0) return 0;
+                                            const nper = -Math.log(numerator) / Math.log(1 + r);
+                                            const totalPayable = nper * emi;
+                                            return Math.max(0, totalPayable - bal);
+                                        };
+                                        const currentInterest = getInterest(loan.remainingBalance, loan.emi, r);
 
-                                    // Function to calculate Total Remaining Interest
-                                    const getInterest = (bal, emi, r) => {
-                                        if (bal <= 0) return 0;
-                                        // NPER = -ln(1 - (r*PV)/PMT) / ln(1+r)
-                                        const numerator = 1 - (r * bal / emi);
-                                        if (numerator <= 0) return 0; // Should not happen for valid loan, implies paid off
-                                        const nper = -Math.log(numerator) / Math.log(1 + r);
-                                        const totalPayable = nper * emi;
-                                        return Math.max(0, totalPayable - bal);
-                                    };
-
-                                    const currentInterest = getInterest(loan.remainingBalance, loan.emi, r);
-
-                                    if (projectedBalance <= 0) {
-                                        // Full Payment: You save ALL remaining interest
-                                        totalSavings = currentInterest;
-                                    } else {
-                                        // Partial Payment: Savings = Old Interest - New Interest
-                                        // Note: EMI usually stays same for partial payment in many Indian banks (tenure reduces).
-                                        // So we calculate new interest assuming SAME EMI but lower balance.
-                                        const newInterest = getInterest(projectedBalance, loan.emi, r);
-                                        totalSavings = currentInterest - newInterest;
+                                        if (projectedBalance <= 0) {
+                                            totalSavings = currentInterest;
+                                        } else {
+                                            const newInterest = getInterest(projectedBalance, loan.emi, r);
+                                            totalSavings = currentInterest - newInterest;
+                                        }
                                     }
+                                } catch (e) {
+                                    console.warn("Savings Calc Error", e);
+                                    totalSavings = 0;
                                 }
 
                                 return (
@@ -239,16 +241,16 @@ const DebtSimulator = () => {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center">
                                                 <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-xs font-bold ${loan.type === 'Bank' ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}`}>
-                                                    {loan.type[0]}
+                                                    {(loan.type || 'L')[0]}
                                                 </div>
                                                 <div className="ml-3">
-                                                    <div className="text-sm font-bold text-gray-900">{loan.name}</div>
+                                                    <div className="text-sm font-bold text-gray-900">{loan.name || 'Unknown Loan'}</div>
                                                     <div className="text-xs text-gray-500">{loan.type} Loan</div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {loan.type === 'Bank' ? (
+                                            {(loan.type === 'Bank' || loan.type === 'Hand') ? (
                                                 <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-50 text-blue-700">
                                                     {rate}% p.a.
                                                 </span>
@@ -269,18 +271,18 @@ const DebtSimulator = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                            ₹{Number(loan.emi || loan.monthlyInterest).toLocaleString()}
+                                            ₹{Number(loan.emi || loan.monthlyInterest || 0).toLocaleString()}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 {extra > 0 && loan.type === 'Bank' && (
                                                     <span className="text-[10px] text-emerald-600 font-medium mr-2">
-                                                        Save ~₹{Math.round(totalSavings).toLocaleString()} Total
+                                                        Save ~₹{Math.round(totalSavings || 0).toLocaleString()} Total
                                                     </span>
                                                 )}
                                                 {extra > 0 && loan.type === 'Hand' && (
                                                     <span className="text-[10px] text-emerald-600 font-medium mr-2">
-                                                        Save ₹{Math.round(extra * (loan.interestRate || 24) / 1200).toLocaleString()}/mo
+                                                        Save ~₹{Math.round(extra * (loan.interestRate || 24) / 1200).toLocaleString()}/mo
                                                     </span>
                                                 )}
                                                 <div className="relative w-32">
@@ -307,7 +309,7 @@ const DebtSimulator = () => {
                                     </tr>
                                 );
                             })}
-                            {loans.length === 0 && (
+                            {(!loans || loans.length === 0) && (
                                 <tr>
                                     <td colSpan="5" className="px-6 py-10 text-center text-gray-500 text-sm">
                                         No active loans. You are debt free!
@@ -317,10 +319,10 @@ const DebtSimulator = () => {
                         </tbody>
                     </table>
                 </div>
-            </div >
+            </div>
 
             {/* Bottom Action Bar */}
-            < div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-20 shadow-lg md:pl-64" >
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-4 z-20 shadow-lg md:pl-64">
                 <div className="max-w-4xl mx-auto flex justify-between items-center">
                     <button
                         onClick={handleInit}
@@ -329,23 +331,33 @@ const DebtSimulator = () => {
                         <RefreshCw className="w-4 h-4" /> Reset
                     </button>
 
-                    <button
-                        onClick={handleNextStage}
-                        disabled={processing || isWalletNegative}
-                        className={`flex items-center gap-2 px-8 py-3 text-white text-lg font-bold rounded-full shadow-lg transition-all ${isWalletNegative
-                            ? 'bg-gray-400 cursor-not-allowed'
-                            : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-200/50'
-                            }`}
-                    >
-                        {processing ? 'Calculating...' : (
-                            <>
-                                Next Month <ArrowRight className="w-5 h-5" />
-                            </>
-                        )}
-                    </button>
+                    <div className="flex gap-4">
+                        <button
+                            onClick={handleReverse}
+                            disabled={processing}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-3 rounded-full font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
+                        >
+                            <ArrowLeft className="w-5 h-5" /> Previous Month
+                        </button>
+
+                        <button
+                            onClick={handleNextStage}
+                            disabled={processing || isWalletNegative}
+                            className={`flex items-center gap-2 px-8 py-3 text-white text-lg font-bold rounded-full shadow-lg transition-all ${isWalletNegative
+                                ? 'bg-gray-400 cursor-not-allowed'
+                                : 'bg-blue-600 hover:bg-blue-700 hover:shadow-blue-200/50'
+                                }`}
+                        >
+                            {processing ? 'Calculating...' : (
+                                <>
+                                    Next Month <ArrowRight className="w-5 h-5" />
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
-            </div >
-        </div >
+            </div>
+        </div>
     );
 };
 
