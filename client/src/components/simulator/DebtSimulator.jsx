@@ -62,22 +62,7 @@ const DebtSimulator = () => {
         }
     };
 
-    const handleReverse = async () => {
-        try {
-            if (!confirm("Go back to the previous month? Current changes will be lost.")) return;
-            setProcessing(true);
-            const res = await api.reverseSimulation();
-            if (res.data.success) {
-                setSession(res.data.data);
-                setExtraPayments({});
-            }
-        } catch (err) {
-            const msg = err.response?.data?.message || err.message;
-            alert("Cannot Reverse: " + msg);
-        } finally {
-            setProcessing(false);
-        }
-    };
+
 
     const handlePaymentChange = (loanId, amount) => {
         setExtraPayments(prev => ({
@@ -195,6 +180,7 @@ const DebtSimulator = () => {
                                 <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Interest Rate</th>
                                 <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Balance</th>
                                 <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Monthly Due</th>
+                                <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Total Interest Cost</th>
                                 <th className="px-6 py-3 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Pay Extra</th>
                             </tr>
                         </thead>
@@ -273,6 +259,37 @@ const DebtSimulator = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             ₹{Number(loan.emi || loan.monthlyInterest || 0).toLocaleString()}
                                         </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                            {(() => {
+                                                if (loan.type !== 'Bank') return <span className="text-gray-400 text-xs">N/A</span>;
+                                                // Calculate Current Total Interest (Without Extra)
+                                                // Using the same getInterest logic but for current balance
+                                                const r = (loan.interestRate || 0) / 1200;
+                                                const getInterestSimple = (bal, emi, r) => {
+                                                    if (bal <= 0 || emi <= 0 || r <= 0) return 0;
+                                                    const num = 1 - (r * bal / emi);
+                                                    if (num <= 0) return 0;
+                                                    const nper = -Math.log(num) / Math.log(1 + r);
+                                                    return Math.max(0, (nper * emi) - bal);
+                                                };
+
+                                                const currentTotalInterest = getInterestSimple(loan.remainingBalance, loan.emi, r);
+
+                                                // If Extra Payment > 0, we can show the NEW Total Interest
+                                                const extra = Number(extraPayments[loan._id] || 0);
+                                                if (extra > 0) {
+                                                    const projBal = Math.max(0, loan.remainingBalance - extra);
+                                                    const newTotalInterest = getInterestSimple(projBal, loan.emi, r);
+                                                    return (
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs text-gray-400 line-through">₹{Math.round(currentTotalInterest).toLocaleString()}</span>
+                                                            <span className="font-bold text-emerald-600">₹{Math.round(newTotalInterest).toLocaleString()}</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                return <span className="font-bold text-gray-700">₹{Math.round(currentTotalInterest).toLocaleString()}</span>;
+                                            })()}
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 {extra > 0 && loan.type === 'Bank' && (
@@ -332,13 +349,7 @@ const DebtSimulator = () => {
                     </button>
 
                     <div className="flex gap-4">
-                        <button
-                            onClick={handleReverse}
-                            disabled={processing}
-                            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-3 rounded-full font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
-                        >
-                            <ArrowLeft className="w-5 h-5" /> Previous Month
-                        </button>
+
 
                         <button
                             onClick={handleNextStage}
