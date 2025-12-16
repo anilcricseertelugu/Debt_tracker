@@ -7,6 +7,8 @@ const DebtSimulator = () => {
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
     const [extraPayments, setExtraPayments] = useState({});
+    const [simIncome, setSimIncome] = useState(0);
+    const [simExpenses, setSimExpenses] = useState(0);
     const [processing, setProcessing] = useState(false);
 
     useEffect(() => {
@@ -20,6 +22,9 @@ const DebtSimulator = () => {
             const res = await api.getSimulationSession();
             if (res.data.success && res.data.data) {
                 setSession(res.data.data);
+                // Initialize local editable state from session values
+                setSimIncome(res.data.data.monthlyIncome || 0);
+                setSimExpenses(res.data.data.monthlyExpenses || 0);
             } else {
                 setSession(null);
             }
@@ -37,9 +42,13 @@ const DebtSimulator = () => {
             if (res.data.success) {
                 setSession(res.data.data);
                 setExtraPayments({});
+                // Initialize local editable state from session values
+                setSimIncome(res.data.data.monthlyIncome || 0);
+                setSimExpenses(res.data.data.monthlyExpenses || 0);
             }
         } catch (err) {
             alert("Failed to start: " + err.message);
+            console.error('Failed to init simulation:', err);
         } finally {
             setProcessing(false);
         }
@@ -48,15 +57,24 @@ const DebtSimulator = () => {
     const handleNextStage = async () => {
         try {
             setProcessing(true);
-            const res = await api.nextSimulationStage({ extraPayments });
+            const res = await api.nextSimulationStage({
+                extraPayments,
+                monthlyIncome: simIncome,   // Send updated Income
+                monthlyExpenses: simExpenses // Send updated Expenses
+            });
+
             if (res.data.success) {
                 setSession(res.data.data);
                 setExtraPayments({});
+                // Update local state with the returned new values (should match what we sent)
+                setSimIncome(res.data.data.monthlyIncome);
+                setSimExpenses(res.data.data.monthlyExpenses);
             }
         } catch (err) {
             console.error("Next Stage Error:", err);
             const msg = err.response?.data?.message || err.message;
             alert("Simulation Error: " + msg);
+            alert("Error advancing stage: " + (err.response?.data?.message || err.message));
         } finally {
             setProcessing(false);
         }
@@ -131,7 +149,10 @@ const DebtSimulator = () => {
         return sum + (loan.emi || loan.monthlyInterest || 0);
     }, 0);
 
-    const liveMonthlyFreeCash = (session.monthlyIncome || 0) - (session.monthlyExpenses || 0) - activeLoansEMI;
+
+
+    // Dynamic Free Cash Calculation using Editable State
+    const liveMonthlyFreeCash = simIncome - simExpenses - activeLoansEMI;
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-20">
@@ -154,17 +175,40 @@ const DebtSimulator = () => {
                         )}
                         ₹{projectedWallet.toLocaleString()}
                     </div>
-                    {/* Breakdown Display */}
-                    <div className="text-xs text-gray-500 mt-1 flex justify-end gap-2 font-medium items-center">
-                        <span className="text-gray-400">Rollover: ₹{Math.round(breakdown.rollover).toLocaleString()}</span>
-                        <span className="text-gray-300">|</span>
-                        <div className="flex items-center gap-1">
-                            <span className="text-blue-600">Monthly Free Cash: ₹{Math.round(liveMonthlyFreeCash).toLocaleString()}</span>
-                            {potentialFreedCash > 0 && (
-                                <span className="text-emerald-600 bg-emerald-50 px-1 rounded animate-pulse">
-                                    (+₹{Math.round(potentialFreedCash).toLocaleString()} Next Month)
-                                </span>
-                            )}
+                    {/* Breakdown Display & Edits */}
+                    <div className="text-xs text-gray-500 mt-2 flex flex-col items-end gap-1">
+                        <div className="flex gap-4 mb-2">
+                            <div className="flex flex-col items-end">
+                                <label className="text-[10px] text-gray-400 uppercase">Exp. Income</label>
+                                <input
+                                    type="number"
+                                    className="w-24 text-right border-gray-200 rounded text-sm py-1 font-bold text-gray-700 focus:ring-blue-500 focus:border-blue-500"
+                                    value={simIncome}
+                                    onChange={(e) => setSimIncome(Number(e.target.value))}
+                                />
+                            </div>
+                            <div className="flex flex-col items-end">
+                                <label className="text-[10px] text-gray-400 uppercase">Exp. Expenses</label>
+                                <input
+                                    type="number"
+                                    className="w-24 text-right border-gray-200 rounded text-sm py-1 font-bold text-gray-700 focus:ring-blue-500 focus:border-blue-500"
+                                    value={simExpenses}
+                                    onChange={(e) => setSimExpenses(Number(e.target.value))}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end gap-2 font-medium items-center">
+                            <span className="text-gray-400">Rollover: ₹{Math.round(breakdown.rollover).toLocaleString()}</span>
+                            <span className="text-gray-300">|</span>
+                            <div className="flex items-center gap-1">
+                                <span className="text-blue-600">Monthly Free Cash: ₹{Math.round(liveMonthlyFreeCash).toLocaleString()}</span>
+                                {potentialFreedCash > 0 && (
+                                    <span className="text-emerald-600 bg-emerald-50 px-1 rounded animate-pulse">
+                                        (+₹{Math.round(potentialFreedCash).toLocaleString()} Next Month)
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -193,13 +193,17 @@ exports.processNextStage = async (req, res) => {
     console.log("Processing Next Stage...");
     try {
         const userId = await getUserIdForFilter(req);
-        const { extraPayments } = req.body;
+        const { extraPayments, monthlyIncome, monthlyExpenses } = req.body;
 
         // 1. Read Previous Stage Output
         const session = await SimulationSession.findOne({ user: userId });
         if (!session) {
             return res.status(404).json({ message: 'No active simulation found' });
         }
+
+        // UPDATE SESSION CONFIG IF PROVIDED (Persists for future months)
+        if (monthlyIncome !== undefined) session.monthlyIncome = Number(monthlyIncome);
+        if (monthlyExpenses !== undefined) session.monthlyExpenses = Number(monthlyExpenses);
 
         // 2. Process (Input: Previous Session -> Output: Next Session)
         const logs = runMonthlyCycle(session, extraPayments);
