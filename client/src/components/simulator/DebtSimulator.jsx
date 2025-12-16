@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Play, TrendingUp, RefreshCw, Calendar, DollarSign, ArrowRight, Wallet, Percent, AlertCircle } from 'lucide-react';
+import { Play, TrendingUp, RefreshCw, Calendar, ArrowRight, Wallet, AlertCircle } from 'lucide-react';
 import * as api from '../../services/api';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
@@ -28,7 +28,6 @@ const DebtSimulator = () => {
             const res = await api.getSimulationSession();
             if (res.data.success && res.data.data) {
                 setSession(res.data.data);
-                // Initialize local editable state
                 setSimIncome(res.data.data.monthlyIncome || 0);
                 setSimExpenses(res.data.data.monthlyExpenses || 0);
             } else {
@@ -128,7 +127,6 @@ const DebtSimulator = () => {
 
     // --- DATA PREP ---
     const loans = session.loansSnapshot || [];
-    const breakdown = session.financialBreakdown || { rollover: 0, monthlySurplus: 0 };
     const currentWallet = session.walletBalance || 0;
     const totalExtraPay = Object.values(extraPayments).reduce((sum, val) => sum + (Number(val) || 0), 0);
     const projectedWallet = currentWallet - totalExtraPay;
@@ -139,10 +137,8 @@ const DebtSimulator = () => {
         return sum + (loan.emi || loan.monthlyInterest || 0);
     }, 0);
 
-    // Live Calculation
     const liveMonthlyFreeCash = simIncome - simExpenses - activeLoansEMI;
 
-    // Potential Freed Cash (Next Month)
     const potentialFreedCash = (loans || []).reduce((sum, loan) => {
         if (!loan || loan.remainingBalance <= 0) return sum;
         const extra = Number(extraPayments[loan._id] || 0);
@@ -240,7 +236,8 @@ const DebtSimulator = () => {
                     )}
                 </div>
 
-                <div className="overflow-x-auto">
+                {/* DESKTOP TABLE */}
+                <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-gray-50/50 border-b border-gray-100">
@@ -252,109 +249,31 @@ const DebtSimulator = () => {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                            {loans.map(loan => {
-                                if (!loan || loan.remainingBalance <= 0) return null;
-
-                                const extra = Number(extraPayments[loan._id] || 0);
-                                const projectedBalance = Math.max(0, loan.remainingBalance - extra);
-                                const r = (loan.interestRate || 0) / 1200;
-
-                                // Interest Calculation Logic
-                                let interestDisplay = <span className="text-gray-300">-</span>;
-
-                                if (loan.type === 'Bank') {
-                                    const getInterest = (bal, emi, r) => {
-                                        if (bal <= 0 || emi <= 0 || r <= 0) return 0;
-                                        const num = 1 - (r * bal / emi);
-                                        if (num <= 0) return 0;
-                                        const nper = -Math.log(num) / Math.log(1 + r);
-                                        return Math.max(0, (nper * emi) - bal);
-                                    };
-
-                                    const currentInterest = getInterest(loan.remainingBalance, loan.emi, r);
-
-                                    if (extra > 0) {
-                                        // If fully paid, updated interest is 0. Else calc new.
-                                        const newInterest = projectedBalance <= 0 ? 0 : getInterest(projectedBalance, loan.emi, r);
-                                        interestDisplay = (
-                                            <div className="flex flex-col items-end leading-tight">
-                                                <span className="text-[10px] text-gray-400 line-through">₹{Math.round(currentInterest).toLocaleString()}</span>
-                                                <span className="text-xs font-bold text-emerald-600">₹{Math.round(newInterest).toLocaleString()}</span>
-                                            </div>
-                                        );
-                                    } else {
-                                        interestDisplay = <span className="text-xs font-medium text-gray-600">₹{Math.round(currentInterest).toLocaleString()}</span>;
-                                    }
-                                }
-
-                                return (
-                                    <tr key={loan._id} className="hover:bg-gray-50/80 transition-colors group">
-                                        <td className="px-6 py-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${loan.type === 'Bank' ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}>
-                                                    {loan.type === 'Bank' ? 'B' : 'H'}
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm font-bold text-gray-900 whitespace-nowrap">{loan.name}</div>
-                                                    <div className="text-[10px] text-gray-400 font-medium">
-                                                        {loan.interestRate > 0 ? `${loan.interestRate}% APR` : '0% Interest'}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-
-                                        <td className="px-6 py-3 text-right">
-                                            <div className="text-sm font-bold text-gray-900 whitespace-nowrap">₹{loan.remainingBalance.toLocaleString()}</div>
-                                            {extra > 0 && (
-                                                <div className="text-[10px] text-emerald-600 font-medium whitespace-nowrap">
-                                                    Will be ₹{projectedBalance.toLocaleString()}
-                                                </div>
-                                            )}
-                                        </td>
-
-                                        <td className="px-6 py-3 text-right">
-                                            <div className="text-sm font-medium text-gray-600 whitespace-nowrap">
-                                                ₹{(loan.emi || loan.monthlyInterest || 0).toLocaleString()}
-                                            </div>
-                                        </td>
-
-                                        <td className="px-6 py-3 text-right">
-                                            {interestDisplay}
-                                        </td>
-
-                                        <td className="px-6 py-3 flex justify-end">
-                                            <div className="flex justify-end">
-                                                {extra >= loan.remainingBalance ? (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="secondary"
-                                                        onClick={() => handlePaymentChange(loan._id, 0)}
-                                                        className="text-xs border-dashed"
-                                                        title="Click to remove extra payment"
-                                                    >
-                                                        Undo
-                                                    </Button>
-                                                ) : (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="danger" // Using danger/action color for Foreclose
-                                                        className="text-xs bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200 shadow-none"
-                                                        onClick={() => handlePaymentChange(loan._id, loan.remainingBalance)}
-                                                        title={`Pay full balance of ₹${Math.round(loan.remainingBalance).toLocaleString()}`}
-                                                    >
-                                                        Foreclose
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
+                            {loans.map(loan => (
+                                <LoanRow
+                                    key={loan._id}
+                                    loan={loan}
+                                    extraPayments={extraPayments}
+                                    handlePaymentChange={handlePaymentChange}
+                                />
+                            ))}
                         </tbody>
                     </table>
                 </div>
 
-                {/* Empty State / Footer */}
+                {/* MOBILE CARD STACK (STRICT FIELD PARITY) */}
+                <div className="md:hidden p-4 space-y-4 bg-gray-50/50">
+                    {loans.map(loan => (
+                        <LoanCardMobile
+                            key={loan._id}
+                            loan={loan}
+                            extraPayments={extraPayments}
+                            handlePaymentChange={handlePaymentChange}
+                        />
+                    ))}
+                </div>
+
+                {/* Empty State */}
                 {loans.filter(l => l.remainingBalance > 0).length === 0 && (
                     <div className="p-12 text-center text-gray-400">
                         <RefreshCw className="w-12 h-12 mx-auto mb-3 opacity-20" />
@@ -377,6 +296,195 @@ const DebtSimulator = () => {
                     </Button>
                 </div>
             </div>
+        </div>
+    );
+};
+
+// --- SUB COMPONENTS ---
+
+const LoanRow = ({ loan, extraPayments, handlePaymentChange }) => {
+    if (!loan || loan.remainingBalance <= 0) return null;
+
+    const extra = Number(extraPayments[loan._id] || 0);
+    const projectedBalance = Math.max(0, loan.remainingBalance - extra);
+    const r = (loan.interestRate || 0) / 1200;
+
+    // Interest Logic
+    let interestDisplay = <span className="text-gray-300">-</span>;
+    if (loan.type === 'Bank') {
+        const getInterest = (bal, emi, r) => {
+            if (bal <= 0 || emi <= 0 || r <= 0) return 0;
+            const num = 1 - (r * bal / emi);
+            if (num <= 0) return 0;
+            const nper = -Math.log(num) / Math.log(1 + r);
+            return Math.max(0, (nper * emi) - bal);
+        };
+        const currentInterest = getInterest(loan.remainingBalance, loan.emi, r);
+
+        if (extra > 0) {
+            const newInterest = projectedBalance <= 0 ? 0 : getInterest(projectedBalance, loan.emi, r);
+            interestDisplay = (
+                <div className="flex flex-col items-end leading-tight">
+                    <span className="text-[10px] text-gray-400 line-through">₹{Math.round(currentInterest).toLocaleString()}</span>
+                    <span className="text-xs font-bold text-emerald-600">₹{Math.round(newInterest).toLocaleString()}</span>
+                </div>
+            );
+        } else {
+            interestDisplay = <span className="text-xs font-medium text-gray-600">₹{Math.round(currentInterest).toLocaleString()}</span>;
+        }
+    }
+
+    return (
+        <tr className="hover:bg-gray-50/80 transition-colors group">
+            <td className="px-6 py-3">
+                <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold ${loan.type === 'Bank' ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}>
+                        {loan.type === 'Bank' ? 'B' : 'H'}
+                    </div>
+                    <div>
+                        <div className="text-sm font-bold text-gray-900 whitespace-nowrap">{loan.name}</div>
+                        <div className="text-[10px] text-gray-400 font-medium">
+                            {loan.interestRate > 0 ? `${loan.interestRate}% APR` : '0% Interest'}
+                        </div>
+                    </div>
+                </div>
+            </td>
+
+            <td className="px-6 py-3 text-right">
+                <div className="text-sm font-bold text-gray-900 whitespace-nowrap">₹{loan.remainingBalance.toLocaleString()}</div>
+                {extra > 0 && (
+                    <div className="text-[10px] text-emerald-600 font-medium whitespace-nowrap">
+                        Will be ₹{projectedBalance.toLocaleString()}
+                    </div>
+                )}
+            </td>
+
+            <td className="px-6 py-3 text-right">
+                <div className="text-sm font-medium text-gray-600 whitespace-nowrap">
+                    ₹{(loan.emi || loan.monthlyInterest || 0).toLocaleString()}
+                </div>
+            </td>
+
+            <td className="px-6 py-3 text-right">
+                {interestDisplay}
+            </td>
+
+            <td className="px-6 py-3 flex justify-end">
+                <ForecloseButton
+                    loan={loan}
+                    extra={extra}
+                    handlePaymentChange={handlePaymentChange}
+                />
+            </td>
+        </tr>
+    );
+};
+
+// STRICT PARITY MOBILE CARD
+const LoanCardMobile = ({ loan, extraPayments, handlePaymentChange }) => {
+    if (!loan || loan.remainingBalance <= 0) return null;
+    const extra = Number(extraPayments[loan._id] || 0);
+    const projectedBalance = Math.max(0, loan.remainingBalance - extra);
+    const r = (loan.interestRate || 0) / 1200;
+
+    // Same Interest Logic
+    let interestDisplay = <span className="text-gray-300">-</span>;
+    if (loan.type === 'Bank') {
+        const getInterest = (bal, emi, r) => {
+            if (bal <= 0 || emi <= 0 || r <= 0) return 0;
+            const num = 1 - (r * bal / emi);
+            if (num <= 0) return 0;
+            const nper = -Math.log(num) / Math.log(1 + r);
+            return Math.max(0, (nper * emi) - bal);
+        };
+        const currentInterest = getInterest(loan.remainingBalance, loan.emi, r);
+
+        if (extra > 0) {
+            const newInterest = projectedBalance <= 0 ? 0 : getInterest(projectedBalance, loan.emi, r);
+            interestDisplay = (
+                <div className="flex flex-col items-end leading-tight">
+                    <span className="text-[10px] text-gray-400 line-through">₹{Math.round(currentInterest).toLocaleString()}</span>
+                    <span className="font-bold text-emerald-600">₹{Math.round(newInterest).toLocaleString()}</span>
+                </div>
+            );
+        } else {
+            interestDisplay = <span className="font-medium text-gray-600">₹{Math.round(currentInterest).toLocaleString()}</span>;
+        }
+    }
+
+    return (
+        <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-200 text-sm">
+            {/* Field 1: Name (Column 1) */}
+            <div className="flex items-center gap-3 mb-4">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold ${loan.type === 'Bank' ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'}`}>
+                    {loan.type === 'Bank' ? 'B' : 'H'}
+                </div>
+                <div>
+                    <div className="font-bold text-gray-900">{loan.name}</div>
+                    <div className="text-xs text-gray-500">
+                        {loan.interestRate > 0 ? `${loan.interestRate}% APR` : '0% Interest'}
+                    </div>
+                </div>
+            </div>
+
+            {/* Field 2 & 3: Balance (Col 2) & EMI (Col 3) */}
+            <div className="grid grid-cols-2 gap-4 mb-3 border-b border-gray-50 pb-3">
+                <div>
+                    <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">Balance</div>
+                    <div className="text-lg font-bold text-gray-900">₹{loan.remainingBalance.toLocaleString()}</div>
+                    {extra > 0 && (
+                        <div className="text-xs text-emerald-600 font-medium whitespace-nowrap">
+                            Will be ₹{projectedBalance.toLocaleString()}
+                        </div>
+                    )}
+                </div>
+                <div className="text-right">
+                    <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">EMI / Due</div>
+                    <div className="font-medium text-gray-700">₹{(loan.emi || loan.monthlyInterest || 0).toLocaleString()}</div>
+                </div>
+            </div>
+
+            {/* Field 4 & 5: Interest (Col 4) & Pay Extra (Col 5) */}
+            <div className="flex items-center justify-between gap-4">
+                <div>
+                    <div className="text-[10px] text-gray-400 uppercase font-bold mb-1">Interest Cost</div>
+                    <div className="font-medium text-gray-700">{interestDisplay}</div>
+                </div>
+
+                <ForecloseButton
+                    loan={loan}
+                    extra={extra}
+                    handlePaymentChange={handlePaymentChange}
+                />
+            </div>
+        </div>
+    );
+};
+
+const ForecloseButton = ({ loan, extra, handlePaymentChange }) => {
+    return (
+        <div className="flex justify-end">
+            {extra >= loan.remainingBalance ? (
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => handlePaymentChange(loan._id, 0)}
+                    className="text-xs border-dashed"
+                    title="Click to remove extra payment"
+                >
+                    Undo
+                </Button>
+            ) : (
+                <Button
+                    size="sm"
+                    variant="danger"
+                    className="text-xs bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 border border-red-200 shadow-none"
+                    onClick={() => handlePaymentChange(loan._id, loan.remainingBalance)}
+                    title={`Pay full balance of ₹${Math.round(loan.remainingBalance).toLocaleString()}`}
+                >
+                    Foreclose
+                </Button>
+            )}
         </div>
     );
 };
