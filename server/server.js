@@ -14,6 +14,7 @@ const dashboardRoutes = require('./routes/dashboard');
 const calculationRoutes = require('./routes/calculations');
 const authRoutes = require('./routes/authRoutes');
 const budgetRoutes = require('./routes/budgetRoutes');
+const simulationRoutes = require('./routes/simulationRoutes');
 
 const { seedAdmin } = require('./controllers/authController');
 
@@ -36,6 +37,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/calculate', calculationRoutes);
 
 app.use('/api/budget', budgetRoutes);
+app.use('/api/simulation', simulationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

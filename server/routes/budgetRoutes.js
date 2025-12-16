@@ -25,4 +25,9 @@ router.delete('/recurring/:id', optionalProtect, controller.deleteRecurringExpen
 
 router.get('/summary', optionalProtect, controller.getBudgetSummary);
 
+// Simulator Routes
+router.post('/simulator/plans', optionalProtect, controller.savePlan);
+router.get('/simulator/plans', optionalProtect, controller.getSavedPlans);
+router.delete('/simulator/plans/:id', optionalProtect, controller.deleteSavedPlan);
+
 module.exports = router;

@@ -107,4 +107,9 @@ export const deleteRecurringExpense = (id) => api.delete(`/budget/recurring/${id
 
 export const getBudgetSummary = () => api.get('/budget/summary');
 
+// Simulation API
+export const initSimulation = () => api.post('/simulation/init');
+export const nextSimulationStage = (data) => api.post('/simulation/next', data);
+export const getSimulationSession = () => api.get('/simulation/current');
+
 export default api;

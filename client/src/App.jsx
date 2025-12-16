@@ -13,6 +13,7 @@ import RecordPaymentForm from './components/forms/RecordPaymentForm';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import BudgetTracker from './components/budget/BudgetTracker';
+import DebtSimulator from './components/simulator/DebtSimulator';
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
 
               <Route path="pay" element={<RecordPaymentForm />} />
               <Route path="budget-tracker" element={<BudgetTracker />} />
+              <Route path="debt-simulator" element={<DebtSimulator />} />
             </Routes>
           </Layout>
         </Router>

@@ -188,9 +188,57 @@ exports.getBudgetSummary = async (req, res) => {
                         name: l.lenderName,
                         amount: l.loanType === 'Monthly_Interest' ? l.monthlyInterestAmount : 0
                     })).filter(l => l.amount > 0)
+                },
+                // FULL DATA FOR SIMULATOR
+                activeLoans: {
+                    bank: bankLoans,
+                    hand: handLoans
                 }
             }
         });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+// --- Debt Simulator Plans ---
+const SavedPlan = require('../models/SavedPlan');
+
+exports.savePlan = async (req, res) => {
+    try {
+        const userId = await getUserIdForFilter(req);
+        const { name, description, configuration, forecastData } = req.body;
+
+        const plan = new SavedPlan({
+            user: userId,
+            name,
+            description,
+            configuration,
+            forecastData
+        });
+
+        await plan.save();
+        res.status(201).json({ success: true, data: plan });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.getSavedPlans = async (req, res) => {
+    try {
+        const userId = await getUserIdForFilter(req);
+        const plans = await SavedPlan.find({ user: userId }).sort({ createdAt: -1 });
+        res.json({ success: true, data: plans });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+exports.deleteSavedPlan = async (req, res) => {
+    try {
+        const userId = await getUserIdForFilter(req);
+        await SavedPlan.findOneAndDelete({ _id: req.params.id, user: userId });
+        res.json({ success: true, message: 'Plan deleted' });
     } catch (err) {
         res.status(500).json({ success: false, message: err.message });
     }
