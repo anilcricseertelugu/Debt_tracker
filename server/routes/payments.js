@@ -6,6 +6,7 @@ const { protect, optionalProtect, admin } = require('../middleware/authMiddlewar
 
 router.get('/', optionalProtect, controller.getPayments);
 router.post('/', protect, controller.createPayment);
+router.post('/auto-pay', protect, controller.autoPayAll);
 router.get('/loan/:loanId', optionalProtect, controller.getPaymentsByLoanId);
 
 module.exports = router;

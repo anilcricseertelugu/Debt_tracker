@@ -75,6 +75,9 @@ export const getPaymentsByLoan = (loanId) =>
 export const addPayment = (data) =>
     api.post('/payments', data);
 
+export const autoPayAll = () =>
+    api.post('/payments/auto-pay');
+
 // --- Dashboard ---
 export const getDashboardSummary = () =>
     api.get('/dashboard/summary');

@@ -128,8 +128,12 @@ const RecordPaymentForm = () => {
                     />
                     {currentLoan && (
                         <div className="bg-gray-50 p-3 rounded-md text-sm text-gray-700 mb-4">
-                            <p><span className="font-semibold">Outstanding Balance:</span> ₹{(currentLoan.remainingPrincipal || currentLoan.remainingBalance).toLocaleString()}</p>
-                            {loanType === 'Bank' && <p><span className="font-semibold">EMI Amount:</span> ₹{currentLoan.emiAmount.toLocaleString()}</p>}
+                            <p><span className="font-semibold">Outstanding Balance:</span> ₹{(currentLoan.remainingPrincipal || currentLoan.remainingBalance || 0).toLocaleString()}</p>
+
+                            {/* Derive type check directly to avoid state lag crash */}
+                            {bankLoans.some(l => l.loanId === currentLoan.loanId) && (
+                                <p><span className="font-semibold">EMI Amount:</span> ₹{(currentLoan.emiAmount || 0).toLocaleString()}</p>
+                            )}
                         </div>
                     )}
                 </div>
