@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LayoutDashboard, PlusCircle, CreditCard, Wallet, LogOut, Landmark, User } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, CreditCard, Wallet, LogOut, Landmark, User, TrendingUp } from 'lucide-react';
 
 const Layout = ({ children }) => {
     const { user, logout } = useAuth();
@@ -10,6 +10,7 @@ const Layout = ({ children }) => {
     const navItems = [
         { to: "/", icon: <LayoutDashboard size={20} />, label: "Dashboard", end: true },
         { to: "/debt-simulator", icon: <Landmark size={20} />, label: "Simulator" },
+        { to: "/strategy", icon: <TrendingUp size={20} />, label: "Strategy" },
         { to: "/budget-tracker", icon: <Wallet size={20} />, label: "Budget" },
         { to: "/add-loan", icon: <PlusCircle size={20} />, label: "Add Loan" },
         { to: "/pay", icon: <CreditCard size={20} />, label: "Pay" },

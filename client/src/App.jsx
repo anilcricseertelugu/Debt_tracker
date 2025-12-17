@@ -15,6 +15,8 @@ import RegisterForm from './components/auth/RegisterForm';
 import BudgetTracker from './components/budget/BudgetTracker';
 import DebtSimulator from './components/simulator/DebtSimulator';
 
+import StrategyLab from './components/simulator/StrategyLab';
+
 function App() {
   return (
     <AuthProvider>
@@ -36,6 +38,7 @@ function App() {
               <Route path="pay" element={<RecordPaymentForm />} />
               <Route path="budget-tracker" element={<BudgetTracker />} />
               <Route path="debt-simulator" element={<DebtSimulator />} />
+              <Route path="strategy" element={<StrategyLab />} />
             </Routes>
           </Layout>
         </Router>

@@ -95,6 +95,9 @@ export const calculateForeclosure = (data) =>
 export const getAmortizationSchedule = (loanId) =>
     api.get(`/calculate/amortization/${loanId}`);
 
+export const calculateStrategies = (data) =>
+    api.post('/calculate/strategy', data);
+
 // --- Budget ---
 export const getIncomes = () => api.get('/budget/income');
 export const addIncome = (data) => api.post('/budget/income', data);
