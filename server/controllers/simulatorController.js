@@ -33,10 +33,15 @@ const runMonthlyCycle = (session, extraPayments = {}) => {
                     if (numAmount >= (loan.remainingBalance - 10)) {
                         const foreclosureAmount = loan.remainingBalance;
                         if (wallet >= foreclosureAmount) {
+
+                            // CALCULATE SAVINGS BEFORE CLOSING
+                            const saved = calculateSavings(loan);
+                            session.totalInterestSaved = (session.totalInterestSaved || 0) + saved;
+
                             wallet -= foreclosureAmount;
                             loan.remainingBalance = 0;
                             loan.status = 'Closed';
-                            logs.push(`${loan.name} foreclosed`);
+                            logs.push(`${loan.name} foreclosed. Saved ₹${Math.round(saved).toLocaleString()} in interest!`);
                             continue;
                         }
                     }
@@ -115,8 +120,34 @@ const runMonthlyCycle = (session, extraPayments = {}) => {
         monthlySurplus: monthlyCash
     };
 
+    // Ensure strictly number logic
+    if (typeof session.totalInterestSaved !== 'number') session.totalInterestSaved = 0;
+
     session.markModified('loansSnapshot');
     return logs;
+};
+
+// --- HELPERS ---
+const calculateSavings = (loan) => {
+    if (loan.type !== 'Bank') return 0; // Hand loans usually 0 interest or simple
+
+    const bal = loan.remainingBalance || 0;
+    const emi = loan.emi || 0;
+    const r = (loan.interestRate || 0) / 1200; // Monthly Rate
+
+    if (bal <= 0 || emi <= 0 || r <= 0) return 0;
+
+    // NPER = -LOG(1 - (r*PV/PMT)) / LOG(1+r)
+    // Avoid Domain Error for Log
+    const inner = 1 - (r * bal / emi);
+    if (inner <= 0) return 0; // Should not happen for active loan usually
+
+    const nper = -Math.log(inner) / Math.log(1 + r);
+    const totalFuturePayable = nper * emi;
+
+    // Savings = Total Future Payable - Current Principal Balance
+    const savings = Math.max(0, totalFuturePayable - bal);
+    return savings;
 };
 
 exports.initSimulation = async (req, res) => {

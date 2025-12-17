@@ -166,6 +166,12 @@ const DebtSimulator = () => {
                         <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 flex items-center gap-2">
                             {monthLabel}
                         </h1>
+                        {(session.totalInterestSaved || 0) > 0 && (
+                            <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm font-semibold">
+                                <TrendingUp size={14} />
+                                <span>Total Saved: ₹{Math.round(session.totalInterestSaved).toLocaleString()}</span>
+                            </div>
+                        )}
                     </div>
                     <div className="mt-4 flex gap-2 items-center">
                         <Badge variant="neutral">Stage {session.__v || 1}</Badge>

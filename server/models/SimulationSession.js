@@ -33,6 +33,10 @@ const simulationSessionSchema = new mongoose.Schema({
         monthlySurplus: { type: Number, default: 0 }
     },
 
+    // Total Accumulated Interest Saved via Simulation Actions (Foreclosures)
+    // This tracks the "Score" of the user's decisions across the session.
+    totalInterestSaved: { type: Number, default: 0 },
+
     lastUpdated: { type: Date, default: Date.now }
 }, {
     timestamps: true
