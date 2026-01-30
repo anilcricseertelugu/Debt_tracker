@@ -15,6 +15,7 @@ const DebtSimulator = () => {
     const [extraPayments, setExtraPayments] = useState({});
     const [simIncome, setSimIncome] = useState(0);
     const [simExpenses, setSimExpenses] = useState(0);
+    const [walletAdjustment, setWalletAdjustment] = useState('');
 
     // --- EFFECTS ---
     useEffect(() => {
@@ -63,12 +64,14 @@ const DebtSimulator = () => {
             const res = await api.nextSimulationStage({
                 extraPayments,
                 monthlyIncome: simIncome,
-                monthlyExpenses: simExpenses
+                monthlyExpenses: simExpenses,
+                walletAdjustment: Number(walletAdjustment) || 0
             });
 
             if (res.data.success) {
                 setSession(res.data.data);
                 setExtraPayments({});
+                setWalletAdjustment('');
                 setSimIncome(res.data.data.monthlyIncome);
                 setSimExpenses(res.data.data.monthlyExpenses);
             }
@@ -129,7 +132,8 @@ const DebtSimulator = () => {
     const loans = session.loansSnapshot || [];
     const currentWallet = session.walletBalance || 0;
     const totalExtraPay = Object.values(extraPayments).reduce((sum, val) => sum + (Number(val) || 0), 0);
-    const projectedWallet = currentWallet - totalExtraPay;
+    const adjustment = Number(walletAdjustment) || 0;
+    const projectedWallet = currentWallet + adjustment - totalExtraPay;
     const isWalletNegative = projectedWallet < 0;
 
     const activeLoansEMI = (loans || []).reduce((sum, loan) => {
@@ -223,6 +227,16 @@ const DebtSimulator = () => {
                                 value={simExpenses}
                                 onChange={(e) => setSimExpenses(Number(e.target.value))}
                                 className="text-right mb-0"
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <Input
+                                label="Adjust Wallet (+/-)"
+                                type="number"
+                                value={walletAdjustment}
+                                onChange={(e) => setWalletAdjustment(e.target.value)}
+                                placeholder="0"
+                                className={`text-right mb-0 font-medium ${Number(walletAdjustment) !== 0 ? (Number(walletAdjustment) > 0 ? 'text-emerald-600' : 'text-danger-600') : ''}`}
                             />
                         </div>
                     </div>

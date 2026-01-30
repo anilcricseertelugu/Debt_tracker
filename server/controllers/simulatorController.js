@@ -5,17 +5,21 @@ const BankLoan = require('../models/BankLoan');
 const HandLoan = require('../models/HandLoan');
 const { getUserIdForFilter } = require('../utils/authHelper');
 
-// Helper to get next month date
-const getNextMonth = (date) => {
-    const d = new Date(date);
-    d.setMonth(d.getMonth() + 1);
-    return d;
-};
+const { addMonths } = require('../utils/dateHelper');
 
-const runMonthlyCycle = (session, extraPayments = {}) => {
+// Helper removed, using addMonths instead
+
+
+const runMonthlyCycle = (session, extraPayments = {}, walletAdjustment = 0) => {
     // 1. Start with Previous Month's Closing Balance (e.g., 41k)
     let wallet = session.walletBalance;
     let logs = [];
+
+    // 0. Process Wallet Adjustment (User Edit) BEFORE Payments
+    if (walletAdjustment !== 0) {
+        wallet += walletAdjustment;
+        logs.push(`Wallet Adjustment: ${walletAdjustment > 0 ? '+' : ''}₹${walletAdjustment.toLocaleString()}`);
+    }
 
     // 2. Process Jan's Extra Payments (Foreclosure/Partial)
     // This happens *after* Jan EMIs (already deducted in prev cycle) but *before* Feb Income.
@@ -35,7 +39,7 @@ const runMonthlyCycle = (session, extraPayments = {}) => {
                         if (wallet >= foreclosureAmount) {
 
                             // CALCULATE SAVINGS BEFORE CLOSING
-                            const saved = calculateSavings(loan);
+                            const saved = calculateSavings(loan, session);
                             session.totalInterestSaved = (session.totalInterestSaved || 0) + saved;
 
                             wallet -= foreclosureAmount;
@@ -112,7 +116,7 @@ const runMonthlyCycle = (session, extraPayments = {}) => {
     const monthlyCash = (session.monthlyIncome || 0) - (session.monthlyExpenses || 0) - totalObligations;
 
     // 6. Output Generation
-    session.currentDate = getNextMonth(session.currentDate);
+    session.currentDate = addMonths(session.currentDate, 1);
     session.walletBalance = wallet; // Feb End Balance (e.g. 51.5k)
 
     session.financialBreakdown = {
@@ -128,26 +132,67 @@ const runMonthlyCycle = (session, extraPayments = {}) => {
 };
 
 // --- HELPERS ---
-const calculateSavings = (loan) => {
-    if (loan.type !== 'Bank') return 0; // Hand loans usually 0 interest or simple
+const calculateSavings = (loan, session) => {
+    // BANK LOANS: Calculate future interest saved
+    if (loan.type === 'Bank') {
+        const bal = loan.remainingBalance || 0;
+        const emi = loan.emi || 0;
+        const r = (loan.interestRate || 0) / 1200; // Monthly Rate
 
-    const bal = loan.remainingBalance || 0;
-    const emi = loan.emi || 0;
-    const r = (loan.interestRate || 0) / 1200; // Monthly Rate
+        if (bal <= 0 || emi <= 0 || r <= 0) return 0;
 
-    if (bal <= 0 || emi <= 0 || r <= 0) return 0;
+        // NPER = -LOG(1 - (r*PV/PMT)) / LOG(1+r)
+        // Avoid Domain Error for Log
+        const inner = 1 - (r * bal / emi);
+        if (inner <= 0) return 0; // Should not happen for active loan usually
 
-    // NPER = -LOG(1 - (r*PV/PMT)) / LOG(1+r)
-    // Avoid Domain Error for Log
-    const inner = 1 - (r * bal / emi);
-    if (inner <= 0) return 0; // Should not happen for active loan usually
+        const nper = -Math.log(inner) / Math.log(1 + r);
+        const totalFuturePayable = nper * emi;
 
-    const nper = -Math.log(inner) / Math.log(1 + r);
-    const totalFuturePayable = nper * emi;
+        // Savings = Total Future Payable - Current Principal Balance
+        const savings = Math.max(0, totalFuturePayable - bal);
+        return savings;
+    }
 
-    // Savings = Total Future Payable - Current Principal Balance
-    const savings = Math.max(0, totalFuturePayable - bal);
-    return savings;
+    // HAND LOANS: Calculate savings from monthly interest
+    if (loan.type === 'Hand') {
+        const monthlyInterest = loan.monthlyInterest || 0;
+        if (monthlyInterest <= 0) return 0; // Interest-free hand loans
+
+        // Calculate longest active loan tenure
+        let longestTenure = 60; // Default fallback
+
+        if (session && session.loansSnapshot) {
+            const activeBankLoans = session.loansSnapshot.filter(l =>
+                l.status === 'Active' && l.type === 'Bank'
+            );
+
+            if (activeBankLoans.length > 0) {
+                const tenures = activeBankLoans.map(l => {
+                    const bal = l.remainingBalance || 0;
+                    const emi = l.emi || 0;
+                    const r = (l.interestRate || 0) / 1200;
+
+                    if (bal <= 0 || emi <= 0 || r <= 0) return 0;
+
+                    const inner = 1 - (r * bal / emi);
+                    if (inner <= 0) return 0;
+
+                    return -Math.log(inner) / Math.log(1 + r);
+                });
+
+                const maxTenure = Math.max(...tenures);
+                if (maxTenure > 0) {
+                    longestTenure = Math.ceil(maxTenure);
+                }
+            }
+        }
+
+        const savings = monthlyInterest * longestTenure;
+        return savings;
+    }
+
+    return 0;
 };
 
 exports.initSimulation = async (req, res) => {
@@ -224,7 +269,7 @@ exports.processNextStage = async (req, res) => {
     console.log("Processing Next Stage...");
     try {
         const userId = await getUserIdForFilter(req);
-        const { extraPayments, monthlyIncome, monthlyExpenses } = req.body;
+        const { extraPayments, monthlyIncome, monthlyExpenses, walletAdjustment } = req.body;
 
         // 1. Read Previous Stage Output
         const session = await SimulationSession.findOne({ user: userId });
@@ -237,7 +282,7 @@ exports.processNextStage = async (req, res) => {
         if (monthlyExpenses !== undefined) session.monthlyExpenses = Number(monthlyExpenses);
 
         // 2. Process (Input: Previous Session -> Output: Next Session)
-        const logs = runMonthlyCycle(session, extraPayments);
+        const logs = runMonthlyCycle(session, extraPayments, Number(walletAdjustment) || 0);
 
         // 3. Persist Output (for next stage to read)
         console.log("Saving Session Output...", session.currentDate);
