@@ -219,16 +219,24 @@ exports.initSimulation = async (req, res) => {
                 monthlyInterest: 0,
                 status: 'Active'
             })),
-            ...handLoans.map(l => ({
-                originalLoanId: l._id.toString(),
-                name: l.lenderName,
-                type: 'Hand',
-                remainingBalance: l.remainingBalance,
-                emi: 0,
-                interestRate: 0,
-                monthlyInterest: l.loanType === 'Monthly_Interest' ? l.monthlyInterestAmount : 0,
-                status: 'Active'
-            }))
+            ...handLoans.map(l => {
+                let monthlyInterest = 0;
+                // Calculate monthly interest for Monthly_Interest type loans
+                if (l.loanType === 'Monthly_Interest' && l.monthlyInterestRate && l.monthlyInterestRate > 0) {
+                    monthlyInterest = (l.principalAmount * l.monthlyInterestRate) / 100;
+                }
+
+                return {
+                    originalLoanId: l._id.toString(),
+                    name: l.lenderName,
+                    type: 'Hand',
+                    remainingBalance: l.remainingBalance,
+                    emi: 0,
+                    interestRate: 0,
+                    monthlyInterest: monthlyInterest,
+                    status: 'Active'
+                };
+            })
         ];
 
         // START STATE
