@@ -61,9 +61,17 @@ exports.createHandLoan = async (req, res) => {
 
 exports.updateHandLoan = async (req, res) => {
     try {
+        const updateData = { ...req.body };
+
+        // If principalAmount is being updated, sync remainingBalance to match
+        // because the dashboard and simulator both read remainingBalance for outstanding amount
+        if (updateData.principalAmount !== undefined) {
+            updateData.remainingBalance = parseFloat(updateData.principalAmount);
+        }
+
         const updated = await HandLoan.findOneAndUpdate(
             { loanId: req.params.loanId, user: req.user._id }, // Ensure ownership
-            req.body,
+            updateData,
             { new: true }
         );
         if (!updated) return res.status(404).json({ success: false, message: 'Loan not found' });
